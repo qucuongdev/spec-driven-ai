@@ -7,6 +7,8 @@
 > **Spec-Driven AI Development Lifecycle (AI-DLC) Harness & Guardrails for Legacy & Brownfield Codebases.**  
 > Prevent the "Vibe Coding" trap. Protect existing systems, enforce adversarial test verification, and guarantee zero regressions.
 
+📖 **[Xem Sổ tay Hướng dẫn Thực chiến Từng Bước (User Guide)](docs/USER_GUIDE.md)**
+
 ---
 
 ## 🚀 Quick Start (Chạy ngay không cần cài đặt)

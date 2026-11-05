@@ -1,0 +1,41 @@
+{
+  "name": "spec-driven-ai",
+  "version": "1.0.0",
+  "description": "Spec-Driven AI Development Lifecycle (AI-DLC) harness and guardrails for legacy and brownfield codebases.",
+  "main": "bin/cli.js",
+  "bin": {
+    "spec-driven-ai": "./bin/cli.js"
+  },
+  "keywords": [
+    "ai",
+    "ai-dlc",
+    "agentic-workflows",
+    "spec-driven",
+    "guardrails",
+    "adversarial-testing",
+    "brownfield",
+    "software-architecture",
+    "zero-regression",
+    "developer-tools"
+  ],
+  "author": "Cuong Bui <66407505+qucuongdev@users.noreply.github.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qucuongdev/spec-driven-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/qucuongdev/spec-driven-ai/issues"
+  },
+  "homepage": "https://github.com/qucuongdev/spec-driven-ai#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ]
+}

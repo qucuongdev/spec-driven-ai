@@ -1,109 +1,87 @@
-# spec-driven-ai
+# spec-driven-ai — Portable AI-DLC Workflow Kit
 
-[![npm version](https://img.shields.io/npm/v/spec-driven-ai.svg?style=flat-square)](https://www.npmjs.com/package/spec-driven-ai)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://img.shields.io/badge/Node.js-%3E%3D16.0.0-brightgreen.svg?style=flat-square)](https://nodejs.org/)
+An English-language collection of rules, workflows, business-context templates and ticket artifacts to copy into another project. No plugin, npm package installation, account or dependency changes are required.
 
-> **Spec-Driven AI Development Lifecycle (AI-DLC) Harness & Guardrails for Legacy & Brownfield Codebases.**  
-> Prevent the "Vibe Coding" trap. Protect existing systems, enforce adversarial test verification, and guarantee zero regressions.
-
-📖 **[Xem Sổ tay Hướng dẫn Thực chiến Từng Bước (User Guide)](docs/USER_GUIDE.md)**
-
----
-
-## 🚀 Quick Start (Chạy ngay không cần cài đặt)
-
-### 1. Khởi tạo trong bất kỳ dự án nào (Initialize in any repository):
-```bash
-npx spec-driven-ai init
-```
-Lệnh này sẽ tự động thiết lập:
-* `.agents/rules/` — Lồng sắt kỹ thuật (Khóa thư viện, ép File Whitelist, giới hạn Atomic PR).
-* `.agents/workflows/` — Quy trình tác tử (Reverse-spec, Generate-tests, Implement-patch).
-* `specs/templates/` — Mẫu Machine-Readable Spec & Living ADR.
-* `.git/hooks/pre-commit` — Tự động chặn commit nếu Agent vi phạm rào chắn.
-
-### 2. Tạo một bản đặc tả mới cho Ticket (Create a new Spec):
-```bash
-npx spec-driven-ai new JIRA-1024
-```
-Tạo ngay file `specs/active/SPEC-JIRA-1024.md` với đầy đủ metadata và cấu trúc chuẩn.
-
-### 3. Kiểm tra rào chắn an toàn (Verify Guardrails):
-```bash
-npx spec-driven-ai check
-```
-Kiểm tra xem các tệp tin đang sửa đổi có nằm trong `File Whitelist` hay không, thư mục `tests/` có bị can thiệp trái phép không, và số lượng file có vượt ngân sách Atomic PR không.
-
----
-
-## 🧠 Core Philosophy (Triết lý cốt lõi)
-
-1. **Code is a Disposable Artifact (Code là sản phẩm phái sinh dùng một lần):** AI có thể sinh lại mã nguồn trong vài chục giây.
-2. **Spec & Test are Core Assets (Spec & Test là tài sản cốt lõi):** Spec là bản vẽ thiết kế duy nhất, Test là thước đo độc lập không khoan nhượng.
-3. **The 3-Gate Engine (Động cơ 3 Cổng kiểm soát):**
-
-```text
-[CỔNG 1: HUMAN SPEC GATE]
-       │
-       ▼  (Kỹ sư duyệt & đóng băng Spec -> SPEC_FROZEN)
-[CỔNG 2: RED GATE - ADVERSARIAL TESTING]
-       │  (QA Agent sinh test trong tests/ -> BẮT BUỘC PHẢI FAIL)
-       ▼  (Khóa quyền ghi thư mục tests/ -> TESTS_GENERATED)
-[CỔNG 3: GREEN GATE - CONSTRAINED DEV AGENT]
-          (Dev Agent chỉ sửa code trong File Whitelist đến khi 100% test PASS)
-          (Tự động kiểm tra: npx spec-driven-ai check)
-```
-
----
-
-## 🛡️ Key Features & Guardrails
-
-* **Dual-Persona Isolation (Tách biệt đối kháng):** Tác tử viết test và tác tử viết code là hai vai trò độc lập. Developer Agent bị cấm tuyệt đối quyền sửa `tests/` để chống hiện tượng "vừa đá bóng vừa thổi còi".
-* **File Whitelist Enforcement:** Chỉ cho phép Agent chỉnh sửa các file đã được khai báo tại Mục 4 của Spec. Toàn bộ phần còn lại của repo ở trạng thái Read-only.
-* **Dependency Freeze:** Cấm Agent tự ý cài đặt thêm thư viện hoặc sửa đổi package manifests (`package.json`, `pom.xml`, `requirements.txt`).
-* **Atomic PR Budget:** Giới hạn can thiệp tối đa 3–5 file logic trong mỗi tác vụ để kiểm soát triệt để nợ kỹ thuật trên hệ thống Brownfield.
-* **Living ADR (Architecture Decision Record):** Bắt buộc lưu vết lý do kỹ thuật đằng sau mỗi can thiệp để phục vụ bảo trì dài hạn.
-
----
-
-## 📦 Project Structure Installed
+**Take the contents of [`kit/`](kit/) into your target repository root**, including the hidden `.aidlc` directory and the thin `AGENTS.md` bridge. Preserve existing project files and merge conflicting instructions or documentation deliberately.
 
 ```text
 your-project/
-├── .agents/
-│   ├── rules/
-│   │   ├── 01-system-boundaries.md    # Boundary rules & Whitelist enforcement
-│   │   └── 02-adversarial-testing.md   # Role separation & Tests lockdown
-│   └── workflows/
-│       ├── reverse-spec.md            # Codebase archaeologist for legacy files
-│       ├── generate-tests.md          # Adversarial QA workflow (Red Gate)
-│       └── implement-patch.md         # Constrained dev workflow (Green Gate)
-├── specs/
-│   ├── templates/
-│   │   ├── SPEC_TEMPLATE.md           # Machine-readable spec format
-│   │   └── LIVING_ADR_TEMPLATE.md     # Architecture decision record template
-│   ├── active/                        # Current active specs
-│   └── archive/                       # Merged & completed specs
-└── scripts/
-    └── check-guardrails.sh            # POSIX bash fallback
+├── AGENTS.md                  # Thin entry point for coding assistants
+└── .aidlc/
+    ├── rules/
+    ├── workflows/             # Five phases, eleven stages
+    ├── context/
+    │   ├── business/
+    │   └── architecture/
+    ├── specs/
+    │   ├── active/
+    │   ├── archive/
+    │   └── templates/
+    ├── docs/                  # Start Here, User Guide and Workflow
+    └── tools/                 # Optional standalone Node helpers
 ```
 
----
+## Copy into a Project
 
-## 🛠️ How to Publish / Contribute
+You can copy the files manually with your file manager, including hidden files. Or, from this repository, use the optional copy helper:
 
-### Publish to NPM:
-```bash
-# 1. Đăng nhập vào tài khoản npm (nếu chưa đăng nhập):
-npm login
-
-# 2. Xuất bản lên npmjs.com:
-npm publish --access public
+```sh
+node scripts/copy-kit.js ../my-project
 ```
 
----
+The helper copies only missing files, reports conflicts and never edits the target package.json or Git hooks. It does not overwrite existing AGENTS.md, business documents or other files. Review and merge reported conflicts before using the workflow.
 
-## 📄 License
+The bundled `.aidlc/tools/package.json` only isolates CommonJS parsing for the standalone helpers. It has no dependencies or scripts and lets the helpers run inside projects using `"type": "module"` without changing the host project.
 
-MIT © [Cuong Bui](LICENSE)
+On Windows, create a portable archive with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-kit.ps1
+```
+
+The archive contains the kit's root files, exactly AGENTS.md and .aidlc/ at its top level. Extract its contents into the target project after reviewing conflicts. Packaging never overwrites an existing archive.
+
+Packaging refuses source symlinks/junctions/reparse points and linked output ancestors before creating an archive. Use ordinary source files and an output directory outside the kit.
+
+## Start with Your Coding Assistant
+
+Open the target project and ask:
+
+> Read AGENTS.md and .aidlc/docs/AI_DLC_START_HERE.md. Bootstrap our business and technical context using the AI-DLC workflows. Identify assumptions for my review before implementing tickets. Use Markdown tracking and our existing development tools.
+
+The core workflow needs only Markdown and your normal development environment. For ticket tracking without automation, use .aidlc/specs/templates/MANUAL_TRACKER.md. Optional local helpers require Node.js >=16 and Git:
+
+```sh
+# Run in the target project after copying the kit.
+node .aidlc/tools/cli.js help
+node .aidlc/tools/cli.js new JIRA-1024 --profile bugfix
+```
+
+There is no install or init command. Helpers run entirely from the copied files. No API calls, hooks, merges or deployments happen automatically.
+
+## Lifecycle
+
+```mermaid
+flowchart LR
+    context["Initialization: project context"] --> ideation["Ideation: goal and scope"]
+    ideation --> inception["Inception: discovery, requirements and plan"]
+    inception --> construction["Construction: tests, Units, verification and PR"]
+    construction --> operation["Operation: deployment and feedback"]
+    operation -.-> context
+```
+
+A compact adaptation of [AWS AI-DLC](https://github.com/awslabs/aidlc-workflows): 5 phases and 11 stages, with feature, bugfix, refactor and express profiles. See the [diagrams and mapping](kit/.aidlc/docs/WORKFLOW.md) and [user guide](kit/.aidlc/docs/USER_GUIDE.md). Human decisions and actual verification evidence remain essential. Manual tracking is not automatically enforced; local helper receipts do not authenticate identity or guarantee zero regressions.
+
+## Maintain This Repository
+
+`kit/` is the canonical portable payload. Root AGENTS.md and the entire .aidlc/ tree are byte-for-byte mirrors of the kit, including starter context templates. Preserved project-specific context drafts are in MAINTAINER_CONTEXT.md, outside the portable payload; they are not an acknowledged baseline for a target project. Keep shared copies synchronized.
+
+```sh
+npm test
+node scripts/check-kit.js
+npm run test:package
+```
+
+The root package.json is private and provides optional maintainer test aliases only. It is not included in the kit. MIT; see LICENSE and the license notice bundled with the optional helpers.
+
+`npm test` runs the lifecycle suite plus focused regressions using Node.js and Git. `test:package` separately checks ZIP round-trips, ESM consumers and junction rejection; it requires Windows PowerShell on Windows or `pwsh` elsewhere.

@@ -1,4 +1,5 @@
 # Node dependencies & artifacts
+/artifacts/
 node_modules/
 package-lock.json
 *.tgz
@@ -19,4 +20,4 @@ Thumbs.db
 *.swo
 
 # Local active tests/specs when experimenting
-specs/active/SPEC-TEST-*.md
+.aidlc/specs/active/SPEC-TEST-*.md

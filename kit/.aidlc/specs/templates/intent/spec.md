@@ -15,4 +15,4 @@ TODO: Describe before/after behavior, inputs/outputs, errors, permissions, state
 TODO: Define inclusions/exclusions, compatibility, relevant nonfunctional requirements (NFRs), data/migrations and protected behavior. Refactoring work must specify behavior to preserve.
 
 ## Open Questions
-TODO: Record N/A with a reason if no blocking questions remain. Do not implement behavior based on unconfirmed business assumptions.
+TODO: Record N/A with a reason if no blocking questions remain. Resolve safe technical assumptions with evidence; ask only about material unresolved business behavior.

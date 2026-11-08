@@ -1,14 +1,20 @@
 {
   "name": "spec-driven-ai-maintenance",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Maintenance commands for the portable spec-driven-ai workflow kit; not distributed as an npm package.",
   "scripts": {
-    "test": "node tests/lifecycle.test.js && node tests/regressions.test.js",
+    "test": "node scripts/run-tests.js",
     "test:regression": "node tests/regressions.test.js",
     "test:package": "node tests/packaging.test.js",
+    "test:ui": "node tests/ui-playwright.test.js",
     "check:kit": "node scripts/check-kit.js"
   },
-  "engines": { "node": ">=16.0.0" },
-  "license": "MIT"
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.65.0"
+  }
 }

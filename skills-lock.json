@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "excalidraw": {
+      "source": "kv0906/cc-skills",
+      "sourceType": "github",
+      "skillPath": "skills/excalidraw/SKILL.md",
+      "computedHash": "18fbf272c53b81db68f169c7267acc5132ed3a1d72d7a2af8866224bd82c2089"
+    }
+  }
+}

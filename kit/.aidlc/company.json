@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "organization": {
+    "name": null,
+    "ticketSystem": "jira",
+    "repositoryHost": "github"
+  },
+  "workflow": {
+    "defaultMode": "autonomous",
+    "defaultProfile": "feature"
+  },
+  "repository": {
+    "baseBranch": null
+  },
+  "quality": {
+    "requiredCommands": [],
+    "verificationTimeoutMs": 600000,
+    "maxOutputBytes": 10485760
+  },
+  "delivery": {
+    "mode": "pull-request",
+    "merge": "human",
+    "deploy": "human"
+  }
+}

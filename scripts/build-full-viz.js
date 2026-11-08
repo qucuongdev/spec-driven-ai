@@ -1,0 +1,1865 @@
+const fs = require('fs');
+const path = require('path');
+
+const targetPath = path.resolve(__dirname, '../workflow-visualization.html');
+
+// Read the complete source data and template
+const htmlContent = `<!DOCTYPE html>
+<html lang="vi" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Workflow Visualization — AI-DLC v2.1.0 (spec-driven-ai)</title>
+  <!-- Tailwind CSS CDN for utility baseline -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            canvas: '#070a13',
+            surface: '#0f172a',
+            surfaceCard: '#131e33',
+            surfaceBorder: '#1e293b',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg-canvas: #070a13;
+      --bg-panel: #0f172a;
+      --bg-card: #131e33;
+      --border-subtle: #1e293b;
+      --border-medium: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* SVG Canvas Grid Pattern */
+    .canvas-grid {
+      background-size: 32px 32px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+
+    /* Node hover & selection */
+    .wf-node {
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease, transform 0.15s ease;
+      cursor: pointer;
+    }
+    .wf-node:hover {
+      border-color: #6366f1 !important;
+      transform: translateY(-1px);
+    }
+    .wf-node-selected {
+      border-color: #818cf8 !important;
+      box-shadow: 0 0 0 2px #818cf8, 0 10px 25px -4px rgba(0, 0, 0, 0.7) !important;
+      z-index: 40 !important;
+    }
+    .wf-dimmed {
+      opacity: 0.22 !important;
+      pointer-events: none;
+    }
+
+    /* Edge connectors */
+    .wf-edge {
+      fill: none;
+      stroke: #334155;
+      stroke-width: 1.75;
+      transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+    }
+    .wf-edge-loop {
+      stroke: #d97706;
+      stroke-dasharray: 5, 4;
+    }
+    .wf-edge-bypass {
+      stroke: #818cf8;
+      stroke-dasharray: 4, 3;
+      stroke-opacity: 0.85;
+    }
+    .wf-edge-active {
+      stroke: #818cf8 !important;
+      stroke-width: 2.75 !important;
+      z-index: 30;
+    }
+    .wf-edge-loop.wf-edge-active {
+      stroke: #f59e0b !important;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b1120; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    /* Node Subtitle 2-line clamp */
+    .node-sub {
+      line-height: 1.25;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased text-sm">
+
+  <!-- =================================================================== -->
+  <!-- TOP TOOLBAR: BRAND, VIEWS, FILTERS, CONTROLS                        -->
+  <!-- =================================================================== -->
+  <header class="h-14 border-b border-slate-800 bg-slate-900/95 backdrop-blur z-30 flex items-center justify-between px-4 sm:px-6 shrink-0 gap-4">
+    
+    <!-- Left: Brand & Title -->
+    <div class="flex items-center space-x-3.5 shrink-0">
+      <div class="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold font-mono text-white text-sm shadow-sm">
+        AI
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="font-extrabold text-white tracking-tight">AI-DLC v2.1.0 Workflow Visualization</span>
+          <span class="px-2 py-0.2 text-[10px] font-mono font-bold rounded bg-slate-800 text-slate-300 border border-slate-700">Enterprise Standard</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: View Mode Tabs -->
+    <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+      <button id="view-tab-lifecycle" onclick="switchView('lifecycle')" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white transition shadow-sm font-bold flex items-center gap-1.5">
+        <span>Vòng đời AI-DLC (5 Pha & 11 Giai đoạn)</span>
+      </button>
+      <button id="view-tab-swimlanes" onclick="switchView('swimlanes')" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition font-medium flex items-center gap-1.5">
+        <span>Phân luồng Subagents (Swimlanes)</span>
+      </button>
+      <button id="view-tab-github" onclick="switchView('github')" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition font-medium flex items-center gap-1.5">
+        <span>Quy trình Jira-to-GitHub PR</span>
+      </button>
+    </div>
+
+    <!-- Right: Filter, Search & Export Actions -->
+    <div class="flex items-center gap-2.5 shrink-0">
+      
+      <!-- Profile Filter -->
+      <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
+        <span class="text-slate-400 font-mono">Profile:</span>
+        <select id="profile-filter" onchange="applyProfileFilter(this.value)" class="bg-transparent text-white font-mono focus:outline-none cursor-pointer">
+          <option value="all">Tất cả (All)</option>
+          <option value="feature">feature (11 stages)</option>
+          <option value="bugfix">bugfix (10 stages)</option>
+          <option value="refactor">refactor (10 stages)</option>
+          <option value="express">express (7 stages)</option>
+        </select>
+      </div>
+
+      <!-- Quick Search -->
+      <div class="relative">
+        <input id="search-input" type="text" placeholder="Tìm stage, role, artifact..." oninput="handleSearch(this.value)" 
+          class="w-44 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono" />
+      </div>
+
+      <!-- Export SVG Button -->
+      <button onclick="exportDiagramSVG()" title="Xuất file vector SVG độc lập" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-medium flex items-center gap-1.5 transition">
+        <span>Export SVG</span>
+      </button>
+
+      <!-- Toggle Drawer Button -->
+      <button onclick="toggleInspector()" id="btn-toggle-drawer" title="Ẩn/Hiện bảng chi tiết (Inspector)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-semibold transition">
+        <span id="drawer-icon">◀ Chi tiết</span>
+      </button>
+    </div>
+
+  </header>
+
+  <!-- =================================================================== -->
+  <!-- MAIN WORKSPACE: CANVAS + DOCKED INSPECTOR DRAWER                    -->
+  <!-- =================================================================== -->
+  <div class="flex-1 relative flex overflow-hidden">
+
+    <!-- FLOATING CANVAS CONTROLS (BOTTOM-LEFT) -->
+    <div class="absolute bottom-5 left-5 z-20 flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-xl p-1 shadow-xl backdrop-blur">
+      <button onclick="zoomIn()" title="Phóng to (Ctrl + Wheel)" class="h-8 w-8 rounded-lg hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center transition">+</button>
+      <button onclick="zoomOut()" title="Thu nhỏ" class="h-8 w-8 rounded-lg hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center transition">-</button>
+      <button onclick="resetZoom()" title="Kích thước gốc (100%)" id="btn-zoom-val" class="px-2.5 h-8 rounded-lg hover:bg-slate-800 text-slate-300 font-mono text-xs flex items-center justify-center transition">100%</button>
+      <button onclick="fitToScreen()" title="Vừa màn hình (Nhấn F)" class="px-2.5 h-8 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 font-mono text-xs flex items-center justify-center transition">Fit View</button>
+    </div>
+
+    <!-- FLOATING LEGEND (BOTTOM-LEFT ABOVE ZOOM) -->
+    <div class="absolute bottom-18 left-5 z-20 bg-slate-900/90 border border-slate-800 rounded-xl p-3 shadow-xl backdrop-blur text-xs font-mono space-y-2 hidden md:block">
+      <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Chú Giải Ký Hiệu (Legend)</div>
+      <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-slate-300">
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-2.5 rounded-sm bg-blue-500/20 border border-blue-500/60 inline-block"></span>
+          <span>Initialization / Context</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-2.5 rounded-sm bg-purple-500/20 border border-purple-500/60 inline-block"></span>
+          <span>Architect (Inception)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-2.5 rounded-sm bg-emerald-500/20 border border-emerald-500/60 inline-block"></span>
+          <span>QA Tester (Tests)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-2.5 rounded-sm bg-amber-500/20 border border-amber-500/60 inline-block"></span>
+          <span>Coder (Implement)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-2.5 rounded-sm bg-cyan-500/20 border border-cyan-500/60 inline-block"></span>
+          <span>Auditor (Verify / PR)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rotate-45 border border-amber-500 inline-block"></span>
+          <span>Decision Checkpoint</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-4 h-0.5 bg-slate-500 inline-block"></span>
+          <span>Luồng chính (Forward)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-4 h-0.5 border-b border-dashed border-amber-400 inline-block"></span>
+          <span>Vòng lặp sửa lỗi (Revise)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANVAS VIEWPORT (PAN & ZOOM AREA) -->
+    <div id="viewport" class="flex-1 h-full w-full relative canvas-grid overflow-hidden cursor-grab active:cursor-grabbing">
+      
+      <!-- TRANSFORMABLE CANVAS CONTAINER -->
+      <div id="canvas" class="absolute origin-top-left" style="transform: matrix(1, 0, 0, 1, 0, 0); width: 4800px; height: 1800px;">
+        
+        <!-- SVG LAYER (CONNECTORS & SWIMLANES) -->
+        <svg id="svg-layer" class="absolute inset-0 w-full h-full pointer-events-none" style="overflow: visible;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- Marker: Forward Arrow -->
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#475569" />
+            </marker>
+            <!-- Marker: Active Arrow -->
+            <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#818cf8" />
+            </marker>
+            <!-- Marker: Loopback Arrow -->
+            <marker id="arrow-loop" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#f59e0b" />
+            </marker>
+            <!-- Marker: Active Loop Arrow -->
+            <marker id="arrow-loop-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#fbbf24" />
+            </marker>
+          </defs>
+
+          <!-- SVG Phase/Lane Background Headers rendered dynamically -->
+          <g id="svg-background-zones"></g>
+
+          <!-- SVG Paths rendered dynamically -->
+          <g id="svg-edges"></g>
+          
+          <!-- SVG Edge Labels rendered dynamically -->
+          <g id="svg-edge-labels" class="pointer-events-auto"></g>
+        </svg>
+
+        <!-- DOM NODES LAYER rendered dynamically -->
+        <div id="nodes-container" class="absolute inset-0 pointer-events-none"></div>
+
+      </div>
+
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- DOCKED INSPECTOR DRAWER (RIGHT PANEL)                               -->
+    <!-- =================================================================== -->
+    <aside id="inspector-drawer" class="w-96 border-l border-slate-800 bg-slate-900/95 backdrop-blur z-20 flex flex-col shrink-0 shadow-2xl transition-transform duration-200">
+      
+      <!-- Drawer Header -->
+      <div class="h-14 border-b border-slate-800 px-5 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
+          <span class="font-bold text-white text-xs font-mono uppercase tracking-wider">Thông Tin Chi Tiết (Inspector)</span>
+        </div>
+        <button onclick="toggleInspector()" class="text-slate-400 hover:text-white text-xs font-mono px-2 py-1 rounded hover:bg-slate-800 transition">✕ Đóng</button>
+      </div>
+
+      <!-- Drawer Content -->
+      <div class="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+        
+        <!-- Header Info -->
+        <div class="space-y-1.5 border-b border-slate-800 pb-4">
+          <div class="flex items-center gap-2">
+            <span id="ins-badge-phase" class="px-2 py-0.5 font-mono text-[10px] font-bold rounded bg-slate-800 text-slate-300 border border-slate-700">PHASE</span>
+            <span id="ins-badge-id" class="px-2 py-0.5 font-mono text-[10px] font-bold rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">STAGE</span>
+          </div>
+          <h3 id="ins-title" class="text-base font-bold text-white mt-1">Chọn một Node bất kỳ trên sơ đồ</h3>
+          <p id="ins-desc" class="text-slate-300 leading-relaxed text-xs">Nhấp chuột vào bất kỳ thành phần nào trên sơ đồ để xem đầy đủ đặc tả kỹ thuật, tác tử phụ trách, điều kiện nghiệm thu và tài liệu truy vết.</p>
+        </div>
+
+        <!-- Role & Permissions -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold uppercase font-mono text-slate-400">Tác Tử & Phạm Vi Quyền Hạn (RBAC)</div>
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Vai trò / Role:</span>
+              <span id="ins-role" class="font-mono font-bold text-indigo-300 text-xs">N/A</span>
+            </div>
+            <div class="flex items-start justify-between gap-2 border-t border-slate-800/80 pt-2">
+              <span class="text-slate-400 shrink-0">Phạm vi ghi (Write Scope):</span>
+              <span id="ins-scope" class="font-mono text-right text-slate-200 text-[11px]">N/A</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Artifacts: Inputs & Outputs -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold uppercase font-mono text-slate-400">Dữ Liệu Đầu Vào & Đầu Ra (Artifacts)</div>
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2.5 font-mono text-[11px]">
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase">Đầu Vào Cần Thiết (Inputs):</span>
+              <div id="ins-inputs" class="text-slate-200 mt-0.5 space-y-0.5">None</div>
+            </div>
+            <div class="border-t border-slate-800/80 pt-2">
+              <span class="text-emerald-400 block text-[10px] uppercase font-bold">Đầu Ra Sinh Ra (Outputs):</span>
+              <div id="ins-outputs" class="text-emerald-300 mt-0.5 font-bold space-y-0.5">None</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contract & Criteria -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold uppercase font-mono text-slate-400">Điều Kiện Nghiệm Thu (Assertion Contract)</div>
+          <div id="ins-contract" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300 leading-relaxed text-[11px]">
+            N/A
+          </div>
+        </div>
+
+        <!-- CLI Command -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold uppercase font-mono text-slate-400">Lệnh Dòng Lệnh (CLI Execution)</div>
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-[11px] space-y-1.5">
+            <div class="text-slate-400 text-[10px] uppercase">Autonomous Mode (Autopilot):</div>
+            <div id="ins-cmd-auto" class="text-indigo-300 font-bold select-all">N/A</div>
+            <div class="text-slate-400 text-[10px] uppercase pt-1 border-t border-slate-800/60">Reviewed Mode (Human Gate):</div>
+            <div id="ins-cmd-rev" class="text-slate-300 select-all">N/A</div>
+          </div>
+        </div>
+
+        <!-- Document Traceability -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold uppercase font-mono text-slate-400">Truy Vết Tài Liệu Gốc (Traceability)</div>
+          <div id="ins-sources" class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-1.5 text-[11px] font-mono">
+            <div class="text-slate-500">Chưa chọn node</div>
+          </div>
+        </div>
+
+      </div>
+
+    </aside>
+
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- JAVASCRIPT: DATA REPOSITORY & INTERACTIVE ENGINE                    -->
+  <!-- =================================================================== -->
+  <script>
+    // --- COMPREHENSIVE DATA MODEL (100% FIDELITY TO .aidlc/ DOCUMENTS) ---
+    const workflowData = {
+      // 1. MAIN LIFECYCLE (2-ROW WRAPPING ENTERPRISE LAYOUT)
+      lifecycle: {
+        zones: [
+          // Row 1 Zones
+          { id: 'zone-1', title: 'Pha 1: Initialization', x: 40, y: 80, width: 590, height: 260, color: '#3b82f6' },
+          { id: 'zone-2', title: 'Pha 2: Ideation', x: 650, y: 80, width: 280, height: 260, color: '#6366f1' },
+          { id: 'zone-3', title: 'Pha 3: Inception (Khảo Sát & Khóa Scope)', x: 950, y: 80, width: 1125, height: 260, color: '#8b5cf6' },
+          
+          // Row 2 Zones
+          { id: 'zone-4', title: 'Pha 4: Construction (Thi Công & Kiểm Thử Đối Kháng)', x: 40, y: 440, width: 1780, height: 280, color: '#10b981' },
+          { id: 'zone-5', title: 'Pha 5: Operation & Release Gate', x: 1850, y: 440, width: 1160, height: 280, color: '#06b6d4' }
+        ],
+        nodes: [
+          // ROW 1 NODES (INITIALIZATION, IDEATION, INCEPTION)
+          {
+            id: 'n-intake',
+            label: 'Jira Ticket Intake',
+            sub: 'Khởi đầu tiếp nhận yêu cầu',
+            type: 'start',
+            phase: 'Initialization',
+            role: 'Coordinator / User',
+            x: 60, y: 145, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['.aidlc/specs/active/TICKET/'],
+            inputs: ['Jira Ticket Link / Description', 'Acceptance Criteria'],
+            contract: 'Tiếp nhận Jira content và chọn profile phù hợp. Chỉ chạy new sau khi bootstrap context; lệnh ví dụ dùng profile feature.',
+            cmdAuto: 'node .aidlc/tools/cli.js new TICKET --profile feature',
+            cmdRev: 'node .aidlc/tools/cli.js new TICKET --mode reviewed',
+            sources: [
+              { doc: '.aidlc/workflows/jira-to-github.md', sec: '1. Intake and conventions' },
+              { doc: '.aidlc/workflows/ticket-autopilot.md', sec: 'Step 2: Obtain ticket' }
+            ]
+          },
+          {
+            id: 'n-context',
+            label: '0. context',
+            sub: 'Khởi tạo bối cảnh dự án',
+            type: 'stage',
+            phase: 'Initialization',
+            role: 'Coordinator',
+            x: 375, y: 145, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['.aidlc/context/business/*', '.aidlc/context/architecture/system.md', '.aidlc/specs/project-context.json'],
+            inputs: ['README.md', 'Existing Codebase', 'Confluence/Docs'],
+            contract: 'Khảo sát và ghi nhận overview, glossary, rules và system architecture. Baseline cho toàn repo.',
+            cmdAuto: 'node .aidlc/tools/cli.js context --agent coordinator --note "Sources & assumptions"',
+            cmdRev: 'node .aidlc/tools/cli.js context --by "Name" --note "Human acknowledged"',
+            sources: [
+              { doc: '.aidlc/docs/WORKFLOW.md', sec: 'Shared Context and Ticket Delivery' },
+              { doc: '.aidlc/workflows/bootstrap-project-context.md', sec: 'Full workflow' },
+              { doc: '.aidlc/rules/01-system-boundaries.md', sec: 'Context, Scope and Decisions' }
+            ]
+          },
+          {
+            id: 'n-framing',
+            label: '1. framing',
+            sub: 'Xác định mục tiêu & ranh giới',
+            type: 'stage',
+            phase: 'Ideation',
+            role: 'Architect',
+            x: 680, y: 145, w: 215, h: 122,
+            profiles: ['feature'],
+            outputs: ['framing.md'],
+            inputs: ['.aidlc/specs/project-context.json', 'Jira ticket'],
+            contract: 'Làm rõ bài toán, phạm vi giới hạn, người thụ hưởng và các quyết định cần người duyệt.',
+            cmdAuto: 'node .aidlc/tools/cli.js progress TICKET --agent coordinator --note "Framing outputs and evidence assessed"',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Name" --note "Actual human framing decision"',
+            sources: [
+              { doc: '.aidlc/docs/WORKFLOW.md', sec: 'Feature Workflow' },
+              { doc: '.aidlc/workflows/ai-dlc.md', sec: 'framing (feature)' }
+            ]
+          },
+          {
+            id: 'n-discovery',
+            label: '2. discovery',
+            sub: 'Khảo sát kỹ thuật & callers',
+            type: 'stage',
+            phase: 'Inception',
+            role: 'Architect',
+            x: 990, y: 145, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor'],
+            outputs: ['discovery.md'],
+            inputs: ['framing.md', 'Existing source code'],
+            contract: 'Truy vết callers, data schema, API contracts, đánh giá rủi ro kỹ thuật. Read-only code.',
+            cmdAuto: 'node .aidlc/tools/cli.js progress TICKET --agent coordinator --note "Discovery outputs and evidence assessed"',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Name" --note "Actual human discovery decision"',
+            sources: [
+              { doc: '.aidlc/docs/WORKFLOW.md', sec: 'Feature Workflow' },
+              { doc: '.aidlc/workflows/ai-dlc.md', sec: 'discovery (except express)' }
+            ]
+          },
+          {
+            id: 'n-requirements',
+            label: '3. requirements',
+            sub: 'Đặc tả yêu cầu & AC (Spec)',
+            type: 'stage',
+            phase: 'Inception',
+            role: 'Architect',
+            x: 1300, y: 145, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['spec.md'],
+            inputs: ['discovery.md', 'Jira AC'],
+            contract: 'Chuyển hóa yêu cầu thành BDD scenarios, invariants, business rule IDs. Không suy diễn nghiệp vụ.',
+            cmdAuto: 'node .aidlc/tools/cli.js progress TICKET --agent coordinator --note "Requirements and AC assessed"',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Name" --note "Actual human requirements decision"',
+            sources: [
+              { doc: '.aidlc/docs/WORKFLOW.md', sec: 'Feature Workflow' },
+              { doc: '.aidlc/workflows/ai-dlc.md', sec: 'requirements' }
+            ]
+          },
+          {
+            id: 'n-plan',
+            label: '4. plan',
+            sub: 'Hoạch định & Khóa plan.json',
+            type: 'stage',
+            phase: 'Inception',
+            role: 'Architect',
+            x: 1610, y: 145, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['design.md', 'plan.json'],
+            inputs: ['spec.md'],
+            contract: 'Khai báo chính xác allowedFiles, testFiles, dependencyFiles, maxFiles và verificationCommands. Thay đổi phạm vi cần revise và kiểm chứng lại.',
+            cmdAuto: 'node .aidlc/tools/cli.js progress TICKET --agent coordinator --note "Plan paths commands and ownership assessed"',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Name" --note "Actual human plan decision"',
+            sources: [
+              { doc: '.aidlc/rules/01-system-boundaries.md', sec: 'Context, Scope and Decisions' },
+              { doc: '.aidlc/docs/USER_GUIDE.md', sec: 'Plan and Test Integrity' }
+            ]
+          },
+          {
+            id: 'g-plan',
+            label: 'Plan Valid?',
+            sub: 'Kiểm tra tính hợp lệ',
+            type: 'decision',
+            phase: 'Inception',
+            role: 'Coordinator / Lifecycle',
+            x: 1930, y: 174, w: 64, h: 64,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: [],
+            inputs: ['plan.json'],
+            contract: 'Helper kiểm tra đường dẫn, ngân sách file và các chuỗi lệnh bắt buộc trong plan. QA/auditor xác nhận lệnh thực sự chạy được và kiểm tra đúng hành vi.',
+            cmdAuto: 'cli.js internal validation',
+            cmdRev: 'cli.js internal validation',
+            sources: [{ doc: '.aidlc/tools/lifecycle.js', sec: 'plan(root, state)' }]
+          },
+
+          // ROW 2 NODES (CONSTRUCTION, OPERATION, RELEASE)
+          {
+            id: 'n-tests',
+            label: '5. tests',
+            sub: 'Kiểm thử đối kháng (Red Test)',
+            type: 'stage',
+            phase: 'Construction',
+            role: 'QA Tester',
+            x: 60, y: 505, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['test-plan.md', 'Declared testFiles'],
+            inputs: ['spec.md', 'plan.json'],
+            contract: 'QA chỉ sửa đường dẫn trong cả testFiles và allowedFiles, kể cả colocated tests, cùng test-plan.md. UT từ AC/spec phải có behavioral red trước business code; characterization cho refactor có thể PASS. Setup hẹp hoặc trường hợp không tự động hóa cần lý do và đánh giá.',
+            cmdAuto: 'node .aidlc/tools/cli.js progress TICKET --agent coordinator --note "AC tests and valid baseline evidence assessed"',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Name" --note "Actual human test baseline decision"',
+            sources: [
+              { doc: '.aidlc/rules/02-adversarial-testing.md', sec: 'Full rule' },
+              { doc: '.aidlc/workflows/generate-tests.md', sec: 'QA workflow' }
+            ]
+          },
+          {
+            id: 'g-red',
+            label: 'Valid Red?',
+            sub: 'Test fail thật sự',
+            type: 'decision',
+            phase: 'Construction',
+            role: 'QA Tester / Coordinator',
+            x: 384, y: 534, w: 64, h: 64,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: [],
+            inputs: ['test-plan.md exit codes'],
+            contract: 'Kiểm chứng assertion fail do hành vi thiếu/sai; cú pháp, import, fixture và setup không phải behavioral red. Refactor có thể dùng characterization PASS; ngoại lệ phải được coordinator/auditor đánh giá.',
+            cmdAuto: 'Coordinator verification',
+            cmdRev: 'Human assessment',
+            sources: [{ doc: '.aidlc/rules/02-adversarial-testing.md', sec: 'Evidence and Test Integrity' }]
+          },
+          {
+            id: 'n-implement',
+            label: '6. implement',
+            sub: 'Thi công mã nguồn logic',
+            type: 'stage',
+            phase: 'Construction',
+            role: 'Coder',
+            x: 565, y: 505, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['implementation.md', 'Allowed production paths'],
+            inputs: ['test-plan.md', 'plan.json', 'Red tests'],
+            contract: 'Sửa code trong allowedFiles để test chuyển sang xanh. CẤM SỬA TEST CỦA QA.',
+            cmdAuto: 'node .aidlc/tools/cli.js progress TICKET --agent coordinator --note "Implementation Units and evidence assessed"',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Name" --note "Actual human implementation decision"',
+            sources: [
+              { doc: '.aidlc/rules/01-system-boundaries.md', sec: 'Context, Scope and Decisions' },
+              { doc: '.aidlc/workflows/implement-patch.md', sec: 'Coder section' }
+            ]
+          },
+          {
+            id: 'g-scope',
+            label: 'Scope Pass?',
+            sub: 'Kiểm tra vi phạm file',
+            type: 'decision',
+            phase: 'Construction',
+            role: 'Lifecycle CLI',
+            x: 885, y: 534, w: 64, h: 64,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: [],
+            inputs: ['Working tree, index and branch changes', 'plan.json'],
+            contract: 'Chạy check TICKET để kiểm tra scope, ngân sách file và receipts. Baseline dirty được bảo toàn; mọi thay đổi tiếp theo ngoài allowedFiles bị chặn. Scope PASS không chứng minh test đã PASS.',
+            cmdAuto: 'node .aidlc/tools/cli.js check TICKET',
+            cmdRev: 'node .aidlc/tools/cli.js check TICKET',
+            sources: [{ doc: '.aidlc/tools/lifecycle.js', sec: 'check(cwd, ticketId)' }]
+          },
+          {
+            id: 'n-verify',
+            label: '7. verify',
+            sub: 'Xác thực toàn vẹn & Fingerprint',
+            type: 'stage',
+            phase: 'Construction',
+            role: 'Auditor',
+            x: 1070, y: 505, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['verification.md', 'logs/verify-*.txt'],
+            inputs: ['plan.json', 'Tracked/nonignored source', 'Declared tests and context'],
+            contract: 'Fingerprint source/index/context/plan/policy trước và sau lệnh. Chạy đủ các lệnh bắt buộc đúng plan; npm test chỉ là ví dụ. Receipt hợp lệ cần kết quả mới nhất PASS, fingerprint ổn định và log nguyên vẹn; helper không xác thực CI/review từ xa.',
+            cmdAuto: 'node .aidlc/tools/cli.js verify TICKET --command "npm test"',
+            cmdRev: 'node .aidlc/tools/cli.js verify TICKET --command "npm test"',
+            sources: [
+              { doc: '.aidlc/docs/WORKFLOW.md', sec: 'Feature Workflow' },
+              { doc: '.aidlc/tools/lifecycle.js', sec: 'verify(cwd, ticketId, command)' }
+            ]
+          },
+          {
+            id: 'g-verify',
+            label: 'Tests Pass?',
+            sub: 'Kiểm định kết quả',
+            type: 'decision',
+            phase: 'Construction',
+            role: 'Auditor',
+            x: 1390, y: 534, w: 64, h: 64,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: [],
+            inputs: ['verification.md', 'review.md'],
+            contract: 'Tất cả lệnh test exit 0, không có vi phạm bảo mật, không có blocking findings.',
+            cmdAuto: 'Auditor report assessment',
+            cmdRev: 'Auditor report assessment',
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '4. Verify candidate' }]
+          },
+          {
+            id: 'n-pr',
+            label: '8. pr',
+            sub: 'Bản thảo PR & Candidate Commit',
+            type: 'stage',
+            phase: 'Construction',
+            role: 'Auditor / Coordinator',
+            x: 1575, y: 505, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['pr.md', 'review.md', 'delivery.md'],
+            inputs: ['verification.md', 'Git diff'],
+            contract: 'Auditor soạn pr.md/review.md; coordinator xuất bản hoặc cập nhật PR đã được ủy quyền, xử lý CI/review trên đúng HEAD. localDeliveryComplete chỉ là bằng chứng cục bộ; company completion cần PR thật và mọi yêu cầu kiểm tra/review. Không tự merge/deploy hay giả APPROVE.',
+            cmdAuto: 'node .aidlc/tools/cli.js progress TICKET --agent coordinator --note "Local PR evidence assessed remote delivery recorded separately"',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Name" --note "Actual human local PR checkpoint decision"',
+            sources: [
+              { doc: '.aidlc/rules/01-system-boundaries.md', sec: 'Context, Scope and Decisions' },
+              { doc: '.aidlc/workflows/jira-to-github.md', sec: '5. Publish PR' }
+            ]
+          },
+          {
+            id: 'g-human',
+            label: 'Release Gate',
+            sub: 'Ủy quyền phát hành riêng',
+            type: 'decision',
+            phase: 'Operation',
+            role: 'Human Gatekeeper',
+            x: 1910, y: 534, w: 64, h: 64,
+            profiles: ['feature', 'bugfix', 'refactor'],
+            outputs: [],
+            inputs: ['GitHub PR Review', 'CI Passing status'],
+            contract: 'Đáp ứng required CI/review theo policy của repo. Merge/deploy cần ủy quyền riêng từ người có thẩm quyền; AI COMMENT không thay thế human APPROVE khi approval đó được yêu cầu.',
+            cmdAuto: 'Await explicit human release authorization; no automatic merge or deployment',
+            cmdRev: 'Record the actual authorized release decision; never fabricate approval',
+            sources: [{ doc: 'AGENTS.md', sec: 'Review and release boundaries' }]
+          },
+          {
+            id: 'n-deploy',
+            label: '9. deploy',
+            sub: 'Triển khai & Phát hành bản vá',
+            type: 'stage',
+            phase: 'Operation',
+            role: 'Human / DevOps',
+            x: 2095, y: 505, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor'],
+            outputs: ['operations.md', 'Deployment evidence'],
+            inputs: ['Approved PR', 'Signed merge commit'],
+            contract: 'Thực hiện merge và deploy ra production theo phân quyền hạ tầng của công ty.',
+            cmdAuto: 'Human authorization required; autonomous progress stops before deploy',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Ops" --note "Actual authorized deployment evidence assessed"',
+            sources: [
+              { doc: '.aidlc/docs/WORKFLOW.md', sec: 'Feature Workflow' },
+              { doc: '.aidlc/workflows/ai-dlc.md', sec: 'deploy/feedback (except express)' }
+            ]
+          },
+          {
+            id: 'n-feedback',
+            label: '10. feedback',
+            sub: 'Tổng kết & Đóng vòng lặp tri thức',
+            type: 'stage',
+            phase: 'Operation',
+            role: 'Coordinator / Team',
+            x: 2415, y: 505, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor'],
+            outputs: ['feedback.md', 'Reviewed context updates'],
+            inputs: ['Production monitoring', 'Retrospective notes'],
+            contract: 'Ghi nhận bài học sau release đã được ủy quyền. Context thay đổi cần quan sát/acknowledgement mới theo mode; Jira comments hoặc status transitions cần phép riêng. Express không có stage feedback.',
+            cmdAuto: 'Human authorization required for operations feedback; no autonomous stage progress',
+            cmdRev: 'node .aidlc/tools/cli.js advance TICKET --by "Name" --note "Actual authorized operations feedback decision"',
+            sources: [
+              { doc: '.aidlc/docs/WORKFLOW.md', sec: 'Feature Workflow' },
+              { doc: '.aidlc/workflows/ai-dlc.md', sec: 'deploy/feedback (except express)' }
+            ]
+          },
+          {
+            id: 'n-archive',
+            label: 'Optional Record Retention',
+            sub: 'Lưu hồ sơ theo policy repo',
+            type: 'end',
+            phase: 'Operation',
+            role: 'Repository Maintainer',
+            x: 2735, y: 505, w: 215, h: 122,
+            profiles: ['feature', 'bugfix', 'refactor', 'express'],
+            outputs: ['.aidlc/specs/archive/TICKET/'],
+            inputs: ['Completed ticket artifacts'],
+            contract: 'Giữ nguyên hồ sơ và bằng chứng; lưu trữ thủ công khi đã hoàn tất và policy repo cho phép. Helper không có lệnh archive và không tự di chuyển ticket đang hoạt động.',
+            cmdAuto: 'Manual retention according to repository policy; no helper archival command',
+            cmdRev: 'Maintainer reviews completed records and preserves evidence before manual retention',
+            sources: [{ doc: '.aidlc/docs/USER_GUIDE.md', sec: 'Existing Setups and Migration' }]
+          }
+        ],
+        edges: [
+          // Row 1 Forward Edges
+          { from: 'n-intake', to: 'n-context', label: 'bootstrap' },
+          { from: 'n-context', to: 'n-framing', label: 'feature' },
+          { from: 'n-framing', to: 'n-discovery', label: 'feasibility ok' },
+          { from: 'n-discovery', to: 'n-requirements', label: 'baseline' },
+          { from: 'n-requirements', to: 'n-plan', label: 'spec approved' },
+          { from: 'n-plan', to: 'g-plan', label: 'plan.json' },
+          
+          // Wrap from Row 1 to Row 2
+          { from: 'g-plan', to: 'n-tests', label: 'valid scope ➔ handoff to QA', type: 'wrap' },
+
+          // Row 2 Forward Edges
+          { from: 'n-tests', to: 'g-red', label: 'run baseline' },
+          { from: 'g-red', to: 'n-implement', label: 'valid baseline' },
+          { from: 'n-implement', to: 'g-scope', label: 'cli check' },
+          { from: 'g-scope', to: 'n-verify', label: 'scope pass' },
+          { from: 'n-verify', to: 'g-verify', label: 'verify cmd' },
+          { from: 'g-verify', to: 'n-pr', label: 'exit 0 & SHA' },
+          { from: 'n-pr', to: 'g-human', label: 'separate release' },
+          { from: 'g-human', to: 'n-deploy', label: 'human release' },
+          { from: 'n-deploy', to: 'n-feedback', label: 'deployed' },
+          { from: 'n-feedback', to: 'n-archive', label: 'lessons saved' },
+
+          // Express Bypass: 0.context -> 3.requirements
+          { from: 'n-context', to: 'n-requirements', label: 'express bypass', type: 'bypass' },
+
+          // Adversarial & Governance Loopbacks
+          { from: 'g-verify', to: 'n-implement', label: 'Test FAILED (Exit != 0) ➔ Coder refactor logic', type: 'loop', route: { offsetY: 80, stemOffsetX: -14 } },
+          { from: 'g-verify', to: 'n-tests', label: 'QA Assertion Flaw ➔ QA revise assertion', type: 'loop', route: { offsetY: 125, stemOffsetX: +14 } },
+          { from: 'g-scope', to: 'n-plan', label: 'Scope Violation / Extra file ➔ Architect replan', type: 'loop', route: { routeType: 'directUp', channelY: 355 } },
+          { from: 'n-feedback', to: 'n-context', label: 'Close Knowledge Loop ➔ Update context files', type: 'loop', route: { routeType: 'outerBus', offsetY: 155, busX: 14, targetY: 300 } }
+        ]
+      },
+
+      // 2. SUBAGENT SWIMLANES (COORDINATOR, ARCHITECT, QA, CODER, AUDITOR, HUMAN)
+      swimlanes: {
+        lanes: [
+          { id: 'lane-coord', title: 'Coordinator Agent', roleDesc: '• Orchestrator', scopeDesc: 'Context, tracking & release', y: 40, height: 180, color: '#3b82f6' },
+          { id: 'lane-arch', title: 'Architect Subagent', roleDesc: '• Inception Specialist', scopeDesc: 'Framing, spec & plan.json', y: 245, height: 180, color: '#8b5cf6' },
+          { id: 'lane-qa', title: 'QA Tester Subagent', roleDesc: '• Adversarial Specialist', scopeDesc: 'testFiles in allowedFiles; valid baseline', y: 450, height: 180, color: '#10b981' },
+          { id: 'lane-coder', title: 'Coder Subagent', roleDesc: '• Construction Specialist', scopeDesc: 'allowedFiles (exit == 0)', y: 655, height: 180, color: '#f59e0b' },
+          { id: 'lane-auditor', title: 'Auditor Subagent', roleDesc: '• Verification Specialist', scopeDesc: 'SHA fingerprint & pr.md', y: 860, height: 180, color: '#06b6d4' },
+          { id: 'lane-human', title: 'Human Gatekeeper', roleDesc: '• Governance Authority', scopeDesc: 'Review signoff & merge', y: 1065, height: 180, color: '#f43f5e' }
+        ],
+        nodes: [
+          // Coordinator Lane (y: 71)
+          { id: 'sw-c1', label: 'Ticket Intake & Bootstrap', role: 'Coordinator', phase: 'Intake', sub: 'Bootstrap repo & ticket', x: 320, y: 71, w: 215, h: 118, type: 'stage', outputs: ['spec.md', 'tracker.md'], sources: [{ doc: '.aidlc/workflows/ai-dlc.md', sec: 'Steps 1-3' }] },
+          { id: 'sw-c2', label: 'Dispatch Architect', role: 'Coordinator', phase: 'Handoff', sub: 'Inception delegation', x: 650, y: 71, w: 215, h: 118, type: 'stage', outputs: ['dispatch-architect'], sources: [{ doc: '.aidlc/docs/USER_GUIDE.md', sec: 'Multi-agent collaboration' }] },
+          
+          // Architect Lane (y: 276)
+          { id: 'sw-a1', label: 'Framing & Discovery', role: 'Architect', phase: 'Inception', sub: 'Callers & architecture scan', x: 980, y: 276, w: 215, h: 118, type: 'stage', outputs: ['framing.md', 'discovery.md'], sources: [{ doc: '.aidlc/agents/architect.md', sec: 'Prompt body' }] },
+          { id: 'sw-a2', label: 'Requirements (spec.md)', role: 'Architect', phase: 'Inception', sub: 'AC to BDD invariants', x: 1310, y: 276, w: 215, h: 118, type: 'stage', outputs: ['spec.md'], sources: [{ doc: '.aidlc/agents/architect.md', sec: 'Spec generation' }] },
+          { id: 'sw-a3', label: 'Plan & Boundary Lock', role: 'Architect', phase: 'Inception', sub: 'Whitelist & commands lock', x: 1640, y: 276, w: 215, h: 118, type: 'stage', outputs: ['plan.json'], sources: [{ doc: '.aidlc/agents/architect.md', sec: 'plan.json whitelist' }] },
+
+          // Coordinator Lane (y: 71)
+          { id: 'sw-c3', label: 'Assess Plan & Dispatch QA', role: 'Coordinator', phase: 'Handoff', sub: 'Validate plan & invoke QA', x: 1970, y: 71, w: 215, h: 118, type: 'stage', outputs: ['assert-plan'], sources: [{ doc: '.aidlc/workflows/ticket-autopilot.md', sec: 'Step 5' }] },
+
+          // QA Tester Lane (y: 481)
+          { id: 'sw-q1', label: 'Author Adversarial Tests', role: 'QA Tester', phase: 'Adversarial', sub: 'Spec-derived test suites', x: 2300, y: 481, w: 215, h: 118, type: 'stage', outputs: ['Declared testFiles'], contract: 'Exact testFiles in allowedFiles, including colocated tests, plus test-plan.md. Production logic stays read-only.', sources: [{ doc: '.aidlc/agents/qa-tester.md', sec: 'Permissions' }] },
+          { id: 'sw-q2', label: 'Execute Test Baseline', role: 'QA Tester', phase: 'Adversarial', sub: 'Behavioral red / characterization', x: 2630, y: 481, w: 215, h: 118, type: 'stage', outputs: ['test-plan.md'], contract: 'Record genuine behavioral red before changed business logic; refactor characterization may pass. Syntax/import/setup failures are not red evidence. Assess documented alternatives through coordinator/auditor.', sources: [{ doc: '.aidlc/agents/qa-tester.md', sec: 'Procedure' }] },
+
+          // Coordinator Lane (y: 71)
+          { id: 'sw-c4', label: 'Assess Red & Dispatch Coder', role: 'Coordinator', phase: 'Handoff', sub: 'Confirm valid red & handoff', x: 2960, y: 71, w: 215, h: 118, type: 'stage', outputs: ['red-verified'], sources: [{ doc: '.aidlc/workflows/ticket-autopilot.md', sec: 'Step 6' }] },
+
+          // Coder Lane (y: 686)
+          { id: 'sw-cd1', label: 'Implement in allowedFiles', role: 'Coder', phase: 'Construction', sub: 'Minimal logic in allowedFiles', x: 3290, y: 686, w: 215, h: 118, type: 'stage', outputs: ['Allowed production paths'], sources: [{ doc: '.aidlc/agents/coder.md', sec: 'Permissions' }] },
+          { id: 'sw-cd2', label: 'Run Local Checks', role: 'Coder', phase: 'Construction', sub: 'Unit checks pass (Exit == 0)', x: 3620, y: 686, w: 215, h: 118, type: 'stage', outputs: ['green-test.log'], sources: [{ doc: '.aidlc/agents/coder.md', sec: 'Zero test edits' }] },
+
+          // Coordinator Lane (y: 71)
+          { id: 'sw-c5', label: 'Assess Green & Dispatch Audit', role: 'Coordinator', phase: 'Handoff', sub: 'Verify scope & invoke audit', x: 3950, y: 71, w: 215, h: 118, type: 'stage', outputs: ['check-scope'], sources: [{ doc: '.aidlc/workflows/implement-patch.md', sec: 'Step 8' }] },
+
+          // Auditor Lane (y: 891)
+          { id: 'sw-au1', label: 'Independent SHA Fingerprint', role: 'Auditor', phase: 'Verification', sub: 'Git tree SHA fingerprint', x: 4280, y: 891, w: 215, h: 118, type: 'stage', outputs: ['verification.md'], sources: [{ doc: '.aidlc/agents/auditor.md', sec: 'Independent audit' }] },
+          { id: 'sw-au2', label: 'Generate PR Evidence', role: 'Auditor', phase: 'Verification', sub: 'Diff audit & pr.md manifest', x: 4610, y: 891, w: 215, h: 118, type: 'stage', outputs: ['pr.md', 'review.md'], sources: [{ doc: '.aidlc/agents/auditor.md', sec: 'pr.md delivery' }] },
+
+          // Coordinator Lane (y: 71)
+          { id: 'sw-c6', label: 'Publish PR & Tag Reviewers', role: 'Coordinator', phase: 'Publication', sub: 'Open PR & post AI COMMENT', x: 4940, y: 71, w: 215, h: 118, type: 'stage', outputs: ['AI Comment'], sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '5. Publish PR' }] },
+
+          // Human Gatekeeper Lane (y: 1096)
+          { id: 'sw-h1', label: 'Review PR & Check CI', role: 'Human Gatekeeper', phase: 'Governance', sub: 'Required reviews & current CI', x: 5270, y: 1096, w: 215, h: 118, type: 'stage', outputs: ['Actual required decisions'], sources: [{ doc: 'AGENTS.md', sec: 'Independent review and required approvals' }] },
+          { id: 'sw-h2', label: 'Authorize Release & Merge', role: 'Human Gatekeeper', phase: 'Governance', sub: 'Separate release authorization', x: 5600, y: 1096, w: 215, h: 118, type: 'stage', outputs: ['Authorized release evidence'], sources: [{ doc: 'AGENTS.md', sec: 'Separate merge/deploy authorization' }] },
+
+          // Coordinator Lane (y: 71)
+          { id: 'sw-c7', label: 'Record Operations Feedback', role: 'Coordinator', phase: 'Closure', sub: 'Authorized lessons & context', x: 5930, y: 71, w: 215, h: 118, type: 'stage', outputs: ['feedback.md'], contract: 'Record authorized operational evidence; Jira comments/status changes need separate explicit authorization. Do not auto-close the Jira ticket.', sources: [{ doc: '.aidlc/docs/WORKFLOW.md', sec: 'Feature Workflow' }] }
+        ],
+        edges: [
+          { from: 'sw-c1', to: 'sw-c2', label: 'context ready' },
+          { from: 'sw-c2', to: 'sw-a1', label: 'dispatch architect' },
+          { from: 'sw-a1', to: 'sw-a2', label: 'framing done' },
+          { from: 'sw-a2', to: 'sw-a3', label: 'spec ready' },
+          { from: 'sw-a3', to: 'sw-c3', label: 'handoff plan.json' },
+          { from: 'sw-c3', to: 'sw-q1', label: 'dispatch qa-tester' },
+          { from: 'sw-q1', to: 'sw-q2', label: 'tests written' },
+          { from: 'sw-q2', to: 'sw-c4', label: 'assessed baseline' },
+          { from: 'sw-c4', to: 'sw-cd1', label: 'dispatch coder' },
+          { from: 'sw-cd1', to: 'sw-cd2', label: 'code logic' },
+          { from: 'sw-cd2', to: 'sw-c5', label: 'green code exit==0' },
+          { from: 'sw-c5', to: 'sw-au1', label: 'dispatch auditor' },
+          { from: 'sw-au1', to: 'sw-au2', label: 'fingerprint ok' },
+          { from: 'sw-au2', to: 'sw-c6', label: 'pr.md ready' },
+          { from: 'sw-c6', to: 'sw-h1', label: 'await human decision' },
+          { from: 'sw-h1', to: 'sw-h2', label: 'release decision' },
+          { from: 'sw-h2', to: 'sw-c7', label: 'release authorized' }
+        ]
+      },
+
+      // 3. JIRA-TO-GITHUB CORPORATE PR LIFECYCLE
+      github: {
+        zones: [
+          { id: 'z-gh-1', title: '1. Tiếp Nhận & Cô Lập Nhánh', x: 40, y: 40, width: 920, height: 430, color: '#3b82f6' },
+          { id: 'z-gh-2', title: '2. Bốn Tác Tử Thực Thi', x: 1010, y: 40, width: 920, height: 430, color: '#8b5cf6' },
+          { id: 'z-gh-3', title: '3. Kiểm Định Ứng Viên HEAD', x: 1980, y: 40, width: 920, height: 430, color: '#10b981' },
+          { id: 'z-gh-4', title: '4. Phát Hành PR & CI Loop', x: 2950, y: 40, width: 1235, height: 430, color: '#06b6d4' }
+        ],
+        nodes: [
+          {
+            id: 'gh-1', label: 'Jira Intake', sub: 'Capture content & AC',
+            role: 'Coordinator', phase: 'Intake', x: 70, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Tiếp nhận URL hoặc nội dung Jira ticket, trích xuất Acceptance Criteria (AC), chọn profile thực thi.',
+            inputs: ['Jira Ticket URL/Content', 'Acceptance Criteria', 'Business Requirements'],
+            outputs: ['Ticket source and AC', 'Selected profile'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '1. Intake' }]
+          },
+          {
+            id: 'gh-2', label: 'Repo & Policy Check', sub: 'CODEOWNERS & company.json',
+            role: 'Coordinator', phase: 'Isolation', x: 385, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Đọc CODEOWNERS, .aidlc/company.json và quy định repo. policy/doctor chỉ chẩn đoán cục bộ; xác minh quyền push/PR và CI/review bằng công cụ được ủy quyền.',
+            inputs: ['CODEOWNERS', '.aidlc/company.json', 'Branch protection rules'],
+            outputs: ['Effective policy', 'Access assessment'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '1. conventions' }]
+          },
+          {
+            id: 'gh-3', label: 'Branch Isolation', sub: 'Ticket branch off base',
+            role: 'Coordinator', phase: 'Isolation', x: 700, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Xác định base branch từ repo/policy thực tế và dùng ticket branch hoặc worktree phù hợp. Bảo toàn staged/unstaged/untracked work; không commit thay đổi không liên quan hay làm trực tiếp trên protected base.',
+            inputs: ['Git repository', 'Base branch HEAD'],
+            outputs: ['ticket-branch', 'Preserved baseline'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '2. Isolate' }]
+          },
+          {
+            id: 'gh-4', label: 'Architect Planning', sub: 'spec.md & plan.json',
+            role: 'Architect', phase: 'Execution', x: 1040, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Khảo sát mã nguồn (read-only), xây dựng spec.md và khóa plan.json (allowedFiles, testFiles, verificationCommands).',
+            inputs: ['spec.md', 'Existing Codebase'],
+            outputs: ['plan.json', 'design.md'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '3. Four-role' }]
+          },
+          {
+            id: 'gh-5', label: 'QA Red Baseline', sub: 'Behavioral red test (exit != 0)',
+            role: 'QA Tester', phase: 'Execution', x: 1355, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'QA viết UT từ AC/spec trong exact testFiles và allowedFiles, chạy baseline bằng project tools trước business code. Behavioral red phải do assertion hành vi; refactor characterization có thể PASS. Setup/fixture/import failure không phải red; không dùng helper verify trước stage implement.',
+            inputs: ['plan.json', 'test-plan.md'],
+            outputs: ['Declared testFiles', 'test-plan.md'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '3. qa-tester' }]
+          },
+          {
+            id: 'gh-6', label: 'Coder Green Code', sub: 'allowedFiles only (exit == 0)',
+            role: 'Coder', phase: 'Execution', x: 1670, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Coder sửa đúng allowedFiles, không sửa tests/assertions/fixtures/config chuyên dụng của QA hoặc plan.json. Setup Unit chỉ sửa tooling/dependencies/wiring đã khai báo, không triển khai business logic trước baseline. Đưa code về green rồi bàn giao auditor độc lập.',
+            inputs: ['plan.json', 'Declared QA tests'],
+            outputs: ['allowedFiles', 'green-test.log'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '3. coder' }]
+          },
+          {
+            id: 'gh-7', label: 'Scoped Candidate Commit', sub: 'Capture exact HEAD SHA',
+            role: 'Coordinator', phase: 'Verification', x: 2010, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Commit riêng thay đổi ticket đã được ủy quyền; không đưa công việc có sẵn của người khác vào commit/push. Ghi nhận đầy đủ source HEAD SHA theo định dạng Git của repo và kiểm chứng lại đúng candidate sau source commit.',
+            inputs: ['Staged changes', 'Git tree'],
+            outputs: ['Candidate SHA', 'HEAD Commit'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '4. Verify candidate' }]
+          },
+          {
+            id: 'gh-8', label: 'Independent Audit', sub: 'Auditor review.md on exact SHA',
+            role: 'Auditor', phase: 'Verification', x: 2325, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Auditor ở context độc lập review toàn bộ code/tests/diff trên đúng source HEAD, đối chiếu AC/plan và chạy đủ lệnh bắt buộc. Ghi commands/exits/logs thật và review.md/pr.md; một context đổi vai không phải review độc lập.',
+            inputs: ['Candidate Commit SHA', 'plan.json', 'test-plan.md'],
+            outputs: ['review.md', 'pr.md'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '4. Auditor review' }]
+          },
+          {
+            id: 'gh-9', label: 'Idempotent PR Creation', sub: 'Reuse or create matching PR',
+            role: 'Coordinator', phase: 'Verification', x: 2640, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Dùng quyền push/PR đã có; kiểm tra đúng owner/repo/base/head và fork owner. Tra cứu để cập nhật PR mở phù hợp, không tạo trùng khi retry. Xác nhận pushed SHA khớp candidate; bản Draft chưa phải completed delivery.',
+            inputs: ['Local branch', '.aidlc/specs/active/TICKET/pr.md'],
+            outputs: ['GitHub PR', 'Remote Branch'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '5. Publish PR' }]
+          },
+          {
+            id: 'gh-10', label: 'Publish AI COMMENT', sub: 'Labeled findings (no APPROVE)',
+            role: 'Coordinator', phase: 'Review', x: 2980, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Đăng nhận xét AI findings minh bạch vào PR dưới dạng COMMENT. Tuyệt đối KHÔNG giả mạo APPROVE.',
+            inputs: ['review.md', 'GitHub PR API'],
+            outputs: ['AI Comment', 'Audit Log'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '5. AI Review Comment' }]
+          },
+          {
+            id: 'gh-11', label: 'Request Reviewers', sub: 'CODEOWNERS / assigned peers',
+            role: 'Coordinator', phase: 'Review', x: 3295, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Yêu cầu reviewers đủ điều kiện, đã xác định từ CODEOWNERS hoặc policy của repo. Không suy diễn Jira assignee thành tài khoản GitHub và không chọn tác giả PR để tự approve.',
+            inputs: ['CODEOWNERS', 'Known eligible GitHub reviewers'],
+            outputs: ['Requested Reviewers'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '5. Reviewer requests' }]
+          },
+          {
+            id: 'gh-12', label: 'CI & Latest-SHA Loop', sub: 'Monitor required checks & review',
+            role: 'Coordinator & Human', phase: 'Review', x: 3610, y: 155, w: 215, h: 118, type: 'stage',
+            contract: 'Đọc required CI/reviews/threads cho current pushed SHA; pending, missing, cancelled hoặc không quan sát được không phải PASS. Trả code findings về coder, test findings về QA, scope về architect; revise rồi verify/push và review độc lập lại SHA mới.',
+            inputs: ['GitHub Checks Status', 'Reviewer Comments / Changes Requested'],
+            outputs: ['CI Passed', 'Clean Review'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '6. Review threads' }]
+          },
+          {
+            id: 'gh-13', label: 'Completion & delivery.md', sub: 'Real PR URL, green CI & receipt',
+            role: 'Coordinator', phase: 'Completion', x: 3925, y: 155, w: 215, h: 118, type: 'end',
+            contract: 'Hoàn tất chỉ khi PR thật đúng repo/base/head, source SHA khớp pushed HEAD, mandatory local/CI checks PASS, independent review và required review policy được đáp ứng, không còn blocker/threads. Ghi delivery.md; localDeliveryComplete/AI COMMENT không chứng minh remote completion. Merge/deploy/Jira writes cần phép riêng.',
+            inputs: ['GitHub PR URL', 'Passing CI Checks', 'Required Approvals'],
+            outputs: ['delivery.md', 'Current PR evidence'],
+            sources: [{ doc: '.aidlc/workflows/jira-to-github.md', sec: '7. Completion' }]
+          }
+        ],
+        edges: [
+          { from: 'gh-1', to: 'gh-2', label: 'intake ok' },
+          { from: 'gh-2', to: 'gh-3', label: 'policy ok' },
+          { from: 'gh-3', to: 'gh-4', label: 'isolated' },
+          { from: 'gh-4', to: 'gh-5', label: 'plan locked' },
+          { from: 'gh-5', to: 'gh-6', label: 'baseline OK' },
+          { from: 'gh-6', to: 'gh-7', label: 'green code' },
+          { from: 'gh-7', to: 'gh-8', label: 'commit SHA' },
+          { from: 'gh-8', to: 'gh-9', label: 'audit clean' },
+          { from: 'gh-9', to: 'gh-10', label: 'PR opened' },
+          { from: 'gh-10', to: 'gh-11', label: 'commented' },
+          { from: 'gh-11', to: 'gh-12', label: 'reviewers' },
+          { from: 'gh-12', to: 'gh-13', label: 'CI passed' },
+          { from: 'gh-12', to: 'gh-6', label: 'CI / Review fix loop ➔ Re-push candidate', type: 'loop', route: { offsetY: 95 } }
+        ]
+      }
+    };
+
+    // --- INTERACTIVE ENGINE STATE ---
+    let currentViewKey = 'lifecycle';
+    let currentProfile = 'all';
+    let selectedNodeId = null;
+    let isDrawerOpen = true;
+    let zoomLevel = 1.0;
+    let panX = 40;
+    let panY = 40;
+    let isDragging = false;
+    let startDragX = 0;
+    let startDragY = 0;
+
+    // --- DOM REFERENCES ---
+    const viewportEl = document.getElementById('viewport');
+    const canvasEl = document.getElementById('canvas');
+    const nodesContainerEl = document.getElementById('nodes-container');
+    const svgZonesEl = document.getElementById('svg-background-zones');
+    const svgEdgesEl = document.getElementById('svg-edges');
+    const svgEdgeLabelsEl = document.getElementById('svg-edge-labels');
+    const drawerEl = document.getElementById('inspector-drawer');
+    const drawerIconEl = document.getElementById('drawer-icon');
+
+    // --- INITIALIZATION ---
+    window.addEventListener('DOMContentLoaded', () => {
+      // Check URL search params or hash for initial view
+      const urlParams = new URLSearchParams(window.location.search);
+      const viewParam = urlParams.get('view');
+      const hash = window.location.hash.replace('#', '');
+      const initialView = viewParam || hash || 'lifecycle';
+      if (['lifecycle', 'swimlanes', 'github'].includes(initialView)) {
+        currentViewKey = initialView;
+      }
+
+      // Update Tab UI
+      ['lifecycle', 'swimlanes', 'github'].forEach(k => {
+        const btn = document.getElementById('view-tab-' + k);
+        if (btn) {
+          if (k === currentViewKey) {
+            btn.className = 'px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white transition shadow-sm font-bold flex items-center gap-1.5';
+          } else {
+            btn.className = 'px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition font-medium flex items-center gap-1.5';
+          }
+        }
+      });
+
+      renderCurrentView();
+      setupPanZoom();
+      setupKeyboardShortcuts();
+      
+      // Auto-select first meaningful node on initial load
+      setTimeout(() => {
+        if (currentViewKey === 'lifecycle') selectNode('n-context');
+        else if (currentViewKey === 'swimlanes') selectNode('sw-c1');
+        else if (currentViewKey === 'github') selectNode('gh-1');
+        fitToScreen();
+      }, 150);
+    });
+
+    // --- SWITCH VIEWS ---
+    function switchView(viewKey) {
+      if (currentViewKey === viewKey) return;
+      currentViewKey = viewKey;
+      selectedNodeId = null;
+      window.location.hash = viewKey;
+
+      // Update tab UI
+      ['lifecycle', 'swimlanes', 'github'].forEach(k => {
+        const btn = document.getElementById('view-tab-' + k);
+        if (k === viewKey) {
+          btn.className = 'px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white transition shadow-sm font-bold flex items-center gap-1.5';
+        } else {
+          btn.className = 'px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition font-medium flex items-center gap-1.5';
+        }
+      });
+
+      renderCurrentView();
+
+      // Auto-select initial node for new view
+      setTimeout(() => {
+        if (viewKey === 'lifecycle') selectNode('n-context');
+        else if (viewKey === 'swimlanes') selectNode('sw-c1');
+        else if (viewKey === 'github') selectNode('gh-1');
+        fitToScreen();
+      }, 100);
+    }
+
+    // --- RENDER ENGINE ---
+    function renderCurrentView() {
+      const data = workflowData[currentViewKey];
+      if (!data) return;
+
+      // 1. Calculate bounding box of all content
+      let maxContentX = 0;
+      let maxContentY = 0;
+      if (data.zones) {
+        data.zones.forEach(z => {
+          maxContentX = Math.max(maxContentX, z.x + z.width);
+          maxContentY = Math.max(maxContentY, z.y + z.height);
+        });
+      }
+      if (data.lanes) {
+        data.lanes.forEach(l => {
+          maxContentY = Math.max(maxContentY, l.y + l.height);
+        });
+      }
+      data.nodes.forEach(n => {
+        maxContentX = Math.max(maxContentX, n.x + n.w);
+        maxContentY = Math.max(maxContentY, n.y + n.h);
+      });
+
+      const dynamicCanvasWidth = Math.max(4600, maxContentX + 300);
+      const dynamicCanvasHeight = Math.max(1600, maxContentY + 300);
+
+      canvasEl.style.width = dynamicCanvasWidth + 'px';
+      canvasEl.style.height = dynamicCanvasHeight + 'px';
+
+      const svgLayer = document.getElementById('svg-layer');
+      if (svgLayer) {
+        svgLayer.setAttribute('width', dynamicCanvasWidth);
+        svgLayer.setAttribute('height', dynamicCanvasHeight);
+        svgLayer.style.width = dynamicCanvasWidth + 'px';
+        svgLayer.style.height = dynamicCanvasHeight + 'px';
+        svgLayer.style.overflow = 'visible';
+      }
+
+      // 2. Clear previous elements
+      nodesContainerEl.innerHTML = '';
+      svgZonesEl.innerHTML = '';
+      svgEdgesEl.innerHTML = '';
+      svgEdgeLabelsEl.innerHTML = '';
+
+      // 3. Render Background Zones / Swimlanes
+      if (data.zones) {
+        data.zones.forEach(zone => {
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', zone.x);
+          rect.setAttribute('y', zone.y);
+          rect.setAttribute('width', zone.width);
+          rect.setAttribute('height', zone.height);
+          rect.setAttribute('rx', '16');
+          rect.setAttribute('fill', '#090e1a');
+          rect.setAttribute('stroke', zone.color);
+          rect.setAttribute('stroke-width', '1');
+          rect.setAttribute('stroke-opacity', '0.25');
+          svgZonesEl.appendChild(rect);
+
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', zone.x + 20);
+          text.setAttribute('y', zone.y + 32);
+          text.setAttribute('fill', zone.color);
+          text.setAttribute('font-size', '12px');
+          text.setAttribute('font-family', 'JetBrains Mono, monospace');
+          text.setAttribute('font-weight', '700');
+          text.setAttribute('letter-spacing', '0.05em');
+          text.textContent = zone.title.toUpperCase();
+          svgZonesEl.appendChild(text);
+        });
+      }
+
+      if (data.lanes) {
+        let maxNodeX = 0;
+        data.nodes.forEach(n => { maxNodeX = Math.max(maxNodeX, n.x + n.w); });
+        const laneWidth = Math.max(dynamicCanvasWidth - 80, maxNodeX + 150);
+        data.lanes.forEach(lane => {
+          // Lane Outer Container
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', 40);
+          rect.setAttribute('y', lane.y);
+          rect.setAttribute('width', laneWidth);
+          rect.setAttribute('height', lane.height);
+          rect.setAttribute('rx', '14');
+          rect.setAttribute('fill', '#090e1a');
+          rect.setAttribute('stroke', lane.color);
+          rect.setAttribute('stroke-width', '1');
+          rect.setAttribute('stroke-opacity', '0.2');
+          svgZonesEl.appendChild(rect);
+
+          // Lane Left Header Accent Bar
+          const headerBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          headerBar.setAttribute('x', 40);
+          headerBar.setAttribute('y', lane.y);
+          headerBar.setAttribute('width', 260);
+          headerBar.setAttribute('height', lane.height);
+          headerBar.setAttribute('rx', '14');
+          headerBar.setAttribute('fill', lane.color);
+          headerBar.setAttribute('fill-opacity', '0.05');
+          headerBar.setAttribute('stroke', lane.color);
+          headerBar.setAttribute('stroke-width', '1');
+          headerBar.setAttribute('stroke-opacity', '0.25');
+          svgZonesEl.appendChild(headerBar);
+
+          // Lane Title
+          const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          title.setAttribute('x', 56);
+          title.setAttribute('y', lane.y + 36);
+          title.setAttribute('fill', lane.color);
+          title.setAttribute('font-size', '13px');
+          title.setAttribute('font-family', 'Inter, sans-serif');
+          title.setAttribute('font-weight', '700');
+          title.textContent = lane.title;
+          svgZonesEl.appendChild(title);
+
+          // Lane Subtitle Line 1 (Role Specialty)
+          const sub1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          sub1.setAttribute('x', 56);
+          sub1.setAttribute('y', lane.y + 58);
+          sub1.setAttribute('fill', '#94a3b8');
+          sub1.setAttribute('font-size', '10.5px');
+          sub1.setAttribute('font-family', 'JetBrains Mono, monospace');
+          sub1.setAttribute('font-weight', '600');
+          sub1.textContent = lane.roleDesc || lane.sub || '';
+          svgZonesEl.appendChild(sub1);
+
+          // Lane Subtitle Line 2 (Scope / Duties)
+          const sub2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          sub2.setAttribute('x', 56);
+          sub2.setAttribute('y', lane.y + 76);
+          sub2.setAttribute('fill', '#64748b');
+          sub2.setAttribute('font-size', '9.5px');
+          sub2.setAttribute('font-family', 'JetBrains Mono, monospace');
+          sub2.textContent = lane.scopeDesc || '';
+          svgZonesEl.appendChild(sub2);
+        });
+      }
+
+      // 3. Render Nodes (DOM cards for crisp rendering & accessibility)
+      const nodeMap = new Map();
+      data.nodes.forEach(node => {
+        nodeMap.set(node.id, node);
+        const card = createNodeElement(node);
+        nodesContainerEl.appendChild(card);
+      });
+
+      // 4. Render SVG Connectors (Edges)
+      data.edges.forEach(edge => {
+        const source = nodeMap.get(edge.from);
+        const target = nodeMap.get(edge.to);
+        if (!source || !target) return;
+
+        createEdgeElements(edge, source, target);
+      });
+
+      // Apply initial profile filtering
+      applyProfileFilter(currentProfile);
+    }
+
+    // --- NODE ELEMENT FACTORY ---
+    function createNodeElement(node) {
+      const card = document.createElement('div');
+      card.id = 'node-' + node.id;
+      card.setAttribute('data-node-id', node.id);
+      card.setAttribute('data-node-label', node.label);
+      card.className = 'wf-node absolute rounded-xl p-2.5 border flex flex-col justify-between shadow-lg pointer-events-auto box-border overflow-hidden';
+      card.style.left = node.x + 'px';
+      card.style.top = node.y + 'px';
+      card.style.width = node.w + 'px';
+      card.style.height = node.h + 'px';
+
+      // Style by node type
+      if (node.type === 'start' || node.type === 'end') {
+        card.style.backgroundColor = '#0b1324';
+        card.style.borderColor = '#1e3a8a';
+      } else if (node.type === 'decision') {
+        card.className += ' rotate-45 flex items-center justify-center text-center';
+        card.style.backgroundColor = '#1c1917';
+        card.style.borderColor = '#78350f';
+        card.innerHTML = \`
+          <div class="-rotate-45 p-1">
+            <div class="node-title text-[10px] font-mono font-bold text-amber-400 uppercase tracking-tighter">\${node.label}</div>
+          </div>
+        \`;
+        card.onclick = (e) => { e.stopPropagation(); selectNode(node.id); };
+        return card;
+      } else {
+        card.style.backgroundColor = '#0f172a';
+        card.style.borderColor = '#1e293b';
+      }
+
+      // Role tag color
+      let roleColor = 'text-slate-400 bg-slate-800 border-slate-700';
+      if (node.role && node.role.includes('Architect')) roleColor = 'text-purple-300 bg-purple-950/60 border-purple-800/60';
+      else if (node.role && node.role.includes('QA')) roleColor = 'text-emerald-300 bg-emerald-950/60 border-emerald-800/60';
+      else if (node.role && node.role.includes('Coder')) roleColor = 'text-amber-300 bg-amber-950/60 border-amber-800/60';
+      else if (node.role && node.role.includes('Auditor')) roleColor = 'text-cyan-300 bg-cyan-950/60 border-cyan-800/60';
+      else if (node.role && node.role.includes('Human')) roleColor = 'text-rose-300 bg-rose-950/60 border-rose-800/60';
+      else if (node.role && node.role.includes('Coordinator')) roleColor = 'text-blue-300 bg-blue-950/60 border-blue-800/60';
+
+      // Clean artifact basename
+      let artifactDisplay = 'artifact';
+      if (node.outputs && node.outputs.length > 0) {
+        const rawOut = node.outputs[0];
+        if (rawOut.includes('/')) {
+          const parts = rawOut.split('/');
+          artifactDisplay = parts[parts.length - 1];
+        } else {
+          artifactDisplay = rawOut;
+        }
+      }
+
+      card.innerHTML = \`
+        <div>
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="node-phase text-[9px] font-mono font-bold tracking-tight text-slate-400 uppercase truncate">\${node.phase || 'PROCESS'}</span>
+            <span class="text-[8.5px] font-mono px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap shrink-0 \${roleColor}">\${node.role || 'System'}</span>
+          </div>
+          <div class="node-title font-bold text-white text-[12px] leading-tight tracking-tight truncate" title="\${node.label}">\${node.label}</div>
+          <div class="node-sub text-[10.5px] text-slate-400 mt-1" title="\${node.sub || ''}">\${node.sub || ''}</div>
+        </div>
+        <div class="mt-auto pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[9.5px] font-mono text-slate-500">
+          <span class="node-artifact text-slate-300 font-mono font-medium truncate max-w-[125px]" title="\${(node.outputs && node.outputs.join(', ')) || ''}">\${artifactDisplay}</span>
+          <span class="text-indigo-400 font-semibold group-hover:text-indigo-300 shrink-0 text-[9.5px]">Inspect ➔</span>
+        </div>
+      \`;
+
+      card.onclick = (e) => {
+        e.stopPropagation();
+        selectNode(node.id);
+      };
+
+      return card;
+    }
+
+    function createEdgeElements(edge, source, target) {
+      const isLoop = edge.type === 'loop';
+      const isWrap = edge.type === 'wrap';
+      const isBypass = edge.type === 'bypass';
+
+      let x1, y1, x2, y2, pathD;
+
+      if (isWrap) {
+        // Serpentine curve: from right of Row 1 down to left of Row 2
+        x1 = source.x + source.w;
+        y1 = source.y + source.h / 2;
+        x2 = target.x;
+        y2 = target.y + target.h / 2;
+        const midY = (y1 + y2) / 2;
+        const extendX = source.x + source.w + 60;
+
+        // Keep left curve cleanly at x >= 30 so outer return bus at x = 14 never intersects
+        pathD = \`M \${x1} \${y1} L \${extendX} \${y1} C \${extendX + 40} \${y1}, \${extendX + 40} \${midY}, \${extendX} \${midY} L 48 \${midY} C 30 \${midY}, 30 \${y2}, 48 \${y2} L \${x2} \${y2}\`;
+      } else if (isLoop && edge.route) {
+        if (edge.route.routeType === 'directUp') {
+          // Direct upward channel between rows (e.g. g-scope -> n-plan)
+          x1 = source.x + source.w / 2;
+          y1 = source.type === 'decision' ? (source.y + source.h / 2 - 46) : source.y;
+          x2 = target.x + target.w / 2;
+          y2 = target.y + target.h;
+          const channelY = edge.route.channelY || 355;
+          pathD = \`M \${x1} \${y1} L \${x1} \${channelY} L \${x2} \${channelY} L \${x2} \${y2 + 6}\`;
+        } else if (edge.route.routeType === 'outerBus') {
+          // Outer perimeter return bus (e.g. n-feedback -> n-context)
+          x1 = source.x + source.w / 2;
+          y1 = source.type === 'decision' ? (source.y + source.h / 2 + 46) : (source.y + source.h);
+          x2 = target.x + target.w / 2;
+          y2 = target.y + target.h;
+          const dropY = source.y + source.h + edge.route.offsetY;
+          const busX = edge.route.busX || 14;
+          const targetY = edge.route.targetY || (target.y + target.h + 24);
+          pathD = \`M \${x1} \${y1} L \${x1} \${dropY} L \${busX} \${dropY} L \${busX} \${targetY} L \${x2} \${targetY} L \${x2} \${y2 + 6}\`;
+        } else {
+          // Standard bottom loopback within row with optional stem offset
+          const stemOffsetX = edge.route.stemOffsetX || 0;
+          x1 = source.x + source.w / 2 + stemOffsetX;
+          y1 = source.type === 'decision' ? (source.y + source.h / 2 + 46) : (source.y + source.h);
+          x2 = target.x + target.w / 2;
+          y2 = target.y + target.h;
+          const dropY = source.y + source.h + edge.route.offsetY;
+          pathD = \`M \${x1} \${y1} L \${x1} \${dropY} L \${x2} \${dropY} L \${x2} \${y2 + 6}\`;
+        }
+      } else if (Math.abs(source.y - target.y) < 40) {
+        // Direct horizontal curve with diamond tip precision
+        x1 = source.type === 'decision' ? (source.x + source.w / 2 + 46) : (source.x + source.w);
+        y1 = source.y + source.h / 2;
+        x2 = target.type === 'decision' ? (target.x + target.w / 2 - 46) : target.x;
+        y2 = target.y + target.h / 2;
+        const dx = (x2 - x1) * 0.5;
+
+        pathD = \`M \${x1} \${y1} C \${x1 + dx} \${y1}, \${x2 - dx} \${y2}, \${x2} \${y2}\`;
+      } else {
+        // Crossing lane curve
+        x1 = source.x + source.w;
+        y1 = source.y + source.h / 2;
+        x2 = target.x;
+        y2 = target.y + target.h / 2;
+        const dx = Math.max(60, Math.abs(x2 - x1) * 0.5);
+
+        pathD = \`M \${x1} \${y1} C \${x1 + dx} \${y1}, \${x2 - dx} \${y2}, \${x2} \${y2}\`;
+      }
+
+      // SVG Path
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.id = \`edge-\${edge.from}-\${edge.to}\`;
+      path.className.baseVal = \`wf-edge \${isLoop ? 'wf-edge-loop' : ''}\`;
+      path.setAttribute('d', pathD);
+      path.setAttribute('marker-end', isLoop ? 'url(#arrow-loop)' : 'url(#arrow)');
+      svgEdgesEl.appendChild(path);
+
+      // Edge Label (Badge placed at midpoint)
+      if (edge.label) {
+        let midX = (x1 + x2) / 2;
+        let midY = (y1 + y2) / 2;
+        if (isLoop && edge.route) {
+          if (edge.route.routeType === 'directUp') {
+            midX = (source.x + target.x) / 2;
+            midY = edge.route.channelY || 355;
+          } else if (edge.route.routeType === 'outerBus') {
+            midX = (source.x + target.x) / 2;
+            midY = source.y + source.h + edge.route.offsetY;
+          } else {
+            midX = (source.x + target.x) / 2;
+            midY = source.y + source.h + edge.route.offsetY;
+          }
+        } else if (isWrap) {
+          midX = 900;
+          midY = (y1 + y2) / 2;
+        } else if (isBypass) {
+          midX = (x1 + x2) / 2;
+          midY = Math.min(source.y, target.y) - 42;
+        }
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.className.baseVal = 'cursor-pointer';
+
+        const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        labelText.setAttribute('x', midX);
+        labelText.setAttribute('y', midY);
+        labelText.setAttribute('text-anchor', 'middle');
+        labelText.setAttribute('dominant-baseline', 'central');
+        labelText.setAttribute('fill', isLoop ? '#f59e0b' : '#94a3b8');
+        labelText.setAttribute('font-size', '10px');
+        labelText.setAttribute('font-family', 'JetBrains Mono, monospace');
+        labelText.setAttribute('font-weight', isLoop ? '700' : '500');
+        labelText.textContent = edge.label;
+
+        // Background pill for label text
+        setTimeout(() => {
+          const bbox = labelText.getBBox();
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', bbox.x - 6);
+          rect.setAttribute('y', bbox.y - 2);
+          rect.setAttribute('width', bbox.width + 12);
+          rect.setAttribute('height', bbox.height + 4);
+          rect.setAttribute('rx', '4');
+          rect.setAttribute('fill', '#090e1a');
+          rect.setAttribute('stroke', isLoop ? '#78350f' : '#1e293b');
+          rect.setAttribute('stroke-width', '1');
+          g.insertBefore(rect, labelText);
+        }, 10);
+
+        g.appendChild(labelText);
+        svgEdgeLabelsEl.appendChild(g);
+      }
+    }
+
+    // --- NODE SELECTION & PATH HIGHLIGHTING ---
+    function selectNode(nodeId) {
+      selectedNodeId = nodeId;
+      const data = workflowData[currentViewKey];
+      const node = data.nodes.find(n => n.id === nodeId);
+      if (!node) return;
+
+      // Highlight active node in DOM
+      data.nodes.forEach(n => {
+        const el = document.getElementById('node-' + n.id);
+        if (el) {
+          el.classList.remove('wf-node-selected');
+        }
+      });
+      const selectedEl = document.getElementById('node-' + nodeId);
+      if (selectedEl) selectedEl.classList.add('wf-node-selected');
+
+      // Traverse connected edges (upstream & downstream)
+      const connectedEdges = new Set();
+      data.edges.forEach(e => {
+        if (e.from === nodeId || e.to === nodeId) {
+          connectedEdges.add(\`edge-\${e.from}-\${e.to}\`);
+        }
+      });
+
+      // Update edge visual states
+      document.querySelectorAll('.wf-edge').forEach(edgeEl => {
+        if (connectedEdges.has(edgeEl.id)) {
+          edgeEl.classList.add('wf-edge-active');
+          if (edgeEl.classList.contains('wf-edge-loop')) {
+            edgeEl.setAttribute('marker-end', 'url(#arrow-loop-active)');
+          } else {
+            edgeEl.setAttribute('marker-end', 'url(#arrow-active)');
+          }
+        } else {
+          edgeEl.classList.remove('wf-edge-active');
+          if (edgeEl.classList.contains('wf-edge-loop')) {
+            edgeEl.setAttribute('marker-end', 'url(#arrow-loop)');
+          } else {
+            edgeEl.setAttribute('marker-end', 'url(#arrow)');
+          }
+        }
+      });
+
+      // Populate Inspector Drawer
+      populateInspector(node);
+      if (!isDrawerOpen) openInspector();
+    }
+
+    function populateInspector(node) {
+      document.getElementById('ins-badge-phase').innerText = (node.phase || 'PROCESS').toUpperCase();
+      document.getElementById('ins-badge-id').innerText = node.label.toUpperCase();
+      document.getElementById('ins-title').innerText = \`\${node.label} — \${node.sub || ''}\`;
+      document.getElementById('ins-desc').innerText = node.contract || 'Giai đoạn xử lý theo quy định kỹ thuật của AI-DLC.';
+      document.getElementById('ins-role').innerText = node.role || 'Unassigned';
+      document.getElementById('ins-scope').innerText = (node.outputs && node.outputs.join(', ')) || 'Read-only';
+      
+      // Inputs
+      const inputsEl = document.getElementById('ins-inputs');
+      inputsEl.innerHTML = '';
+      if (node.inputs && node.inputs.length > 0) {
+        node.inputs.forEach(inp => {
+          const div = document.createElement('div');
+          div.className = 'text-slate-300';
+          div.innerText = '• ' + inp;
+          inputsEl.appendChild(div);
+        });
+      } else {
+        inputsEl.innerText = 'None';
+      }
+
+      // Outputs
+      const outputsEl = document.getElementById('ins-outputs');
+      outputsEl.innerHTML = '';
+      if (node.outputs && node.outputs.length > 0) {
+        node.outputs.forEach(out => {
+          const div = document.createElement('div');
+          div.className = 'text-emerald-300 font-bold';
+          div.innerText = '✔ ' + out;
+          outputsEl.appendChild(div);
+        });
+      } else {
+        outputsEl.innerText = 'None';
+      }
+
+      // Contract
+      document.getElementById('ins-contract').innerText = node.contract || 'Tuân thủ nghiêm ngặt điều kiện quy trình.';
+
+      // CLI Commands
+      document.getElementById('ins-cmd-auto').innerText = node.cmdAuto || 'Tự động điều phối qua coordinator';
+      document.getElementById('ins-cmd-rev').innerText = node.cmdRev || 'Cần phê duyệt từ người dùng (--by)';
+
+      // Sources
+      const sourcesEl = document.getElementById('ins-sources');
+      sourcesEl.innerHTML = '';
+      if (node.sources && node.sources.length > 0) {
+        node.sources.forEach(src => {
+          const div = document.createElement('div');
+          div.className = 'flex items-center justify-between text-slate-300 border-b border-slate-800/60 pb-1';
+          div.innerHTML = \`
+            <span class="text-indigo-400 font-bold">\${src.doc}</span>
+            <span class="text-slate-500 text-[10px]">\${src.sec}</span>
+          \`;
+          sourcesEl.appendChild(div);
+        });
+      } else {
+        sourcesEl.innerHTML = '<span class="text-slate-500">Tài liệu quy trình AI-DLC</span>';
+      }
+    }
+
+    function toggleInspector() {
+      if (isDrawerOpen) closeInspector();
+      else openInspector();
+    }
+
+    function openInspector() {
+      drawerEl.style.transform = 'translateX(0)';
+      isDrawerOpen = true;
+      drawerIconEl.innerText = '▶ Ẩn';
+    }
+
+    function closeInspector() {
+      drawerEl.style.transform = 'translateX(100%)';
+      isDrawerOpen = false;
+      drawerIconEl.innerText = '◀ Chi tiết';
+    }
+
+    // --- PROFILE FILTERING ---
+    function applyProfileFilter(profile) {
+      currentProfile = profile;
+      const data = workflowData[currentViewKey];
+      if (!data) return;
+
+      data.nodes.forEach(node => {
+        const el = document.getElementById('node-' + node.id);
+        if (!el) return;
+
+        if (profile === 'all' || !node.profiles || node.profiles.includes(profile)) {
+          el.classList.remove('wf-dimmed');
+        } else {
+          el.classList.add('wf-dimmed');
+        }
+      });
+    }
+
+    // --- SEARCH / FILTER ---
+    function handleSearch(query) {
+      const q = query.trim().toLowerCase();
+      const data = workflowData[currentViewKey];
+      if (!data) return;
+
+      if (!q) {
+        applyProfileFilter(currentProfile);
+        return;
+      }
+
+      data.nodes.forEach(node => {
+        const el = document.getElementById('node-' + node.id);
+        if (!el) return;
+
+        const match = 
+          (node.label && node.label.toLowerCase().includes(q)) ||
+          (node.sub && node.sub.toLowerCase().includes(q)) ||
+          (node.role && node.role.toLowerCase().includes(q)) ||
+          (node.outputs && node.outputs.some(out => out.toLowerCase().includes(q)));
+
+        if (match) {
+          el.classList.remove('wf-dimmed');
+        } else {
+          el.classList.add('wf-dimmed');
+        }
+      });
+    }
+
+    // --- PAN & ZOOM ENGINE ---
+    function setupPanZoom() {
+      // Pan via mouse drag
+      viewportEl.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.wf-node') || e.target.closest('#inspector-drawer')) return;
+        isDragging = true;
+        startDragX = e.clientX - panX;
+        startDragY = e.clientY - panY;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        panX = e.clientX - startDragX;
+        panY = e.clientY - startDragY;
+        applyTransform();
+      });
+
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+
+      // Zoom via wheel (centered on cursor)
+      viewportEl.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const rect = viewportEl.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+
+        const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+        const newZoom = Math.min(Math.max(0.25, zoomLevel * zoomFactor), 2.5);
+
+        // Adjust pan to keep cursor position fixed
+        panX = cursorX - (cursorX - panX) * (newZoom / zoomLevel);
+        panY = cursorY - (cursorY - panY) * (newZoom / zoomLevel);
+        zoomLevel = newZoom;
+
+        applyTransform();
+      }, { passive: false });
+    }
+
+    function applyTransform() {
+      canvasEl.style.transform = \`matrix(\${zoomLevel}, 0, 0, \${zoomLevel}, \${panX}, \${panY})\`;
+    }
+
+    function zoomIn() {
+      zoomLevel = Math.min(2.5, zoomLevel * 1.2);
+      applyTransform();
+    }
+
+    function zoomOut() {
+      zoomLevel = Math.max(0.25, zoomLevel * 0.8);
+      applyTransform();
+    }
+
+    function resetZoom() {
+      zoomLevel = 1.0;
+      panX = 60;
+      panY = 60;
+      applyTransform();
+    }
+
+    function fitToScreen() {
+      const data = workflowData[currentViewKey];
+      if (!data) return;
+
+      // Calculate bounding box of all content (nodes, zones, lanes)
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      if (data.zones) {
+        data.zones.forEach(z => {
+          minX = Math.min(minX, z.x);
+          minY = Math.min(minY, z.y);
+          maxX = Math.max(maxX, z.x + z.width);
+          maxY = Math.max(maxY, z.y + z.height);
+        });
+      }
+      if (data.lanes) {
+        data.lanes.forEach(l => {
+          minX = Math.min(minX, 40);
+          minY = Math.min(minY, l.y);
+          maxY = Math.max(maxY, l.y + l.height);
+        });
+      }
+      data.nodes.forEach(n => {
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + n.w);
+        maxY = Math.max(maxY, n.y + n.h);
+      });
+
+      const padding = 60;
+      const graphWidth = (maxX - minX) + padding * 2;
+      const graphHeight = (maxY - minY) + padding * 2;
+
+      const viewportWidth = viewportEl.clientWidth;
+      const viewportHeight = viewportEl.clientHeight;
+
+      const scaleX = viewportWidth / graphWidth;
+      const scaleY = viewportHeight / graphHeight;
+      zoomLevel = Math.min(scaleX, scaleY, 1.0);
+
+      panX = (viewportWidth - (maxX - minX) * zoomLevel) / 2 - minX * zoomLevel;
+      panY = (viewportHeight - (maxY - minY) * zoomLevel) / 2 - minY * zoomLevel;
+
+      applyTransform();
+    }
+
+    function setupKeyboardShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeInspector();
+        if (e.key === 'f' || e.key === 'F') fitToScreen();
+        if (e.key === '+' || e.key === '=') zoomIn();
+        if (e.key === '-' || e.key === '_') zoomOut();
+        if (e.key === '0') resetZoom();
+      });
+    }
+
+    // --- EXPORT SVG AS STANDALONE VECTOR FILE ---
+    function exportDiagramSVG() {
+      const data = workflowData[currentViewKey];
+      if (!data) return;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      data.nodes.forEach(n => {
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + n.w);
+        maxY = Math.max(maxY, n.y + n.h);
+      });
+      if (data.zones) {
+        data.zones.forEach(z => {
+          minX = Math.min(minX, z.x);
+          minY = Math.min(minY, z.y);
+          maxX = Math.max(maxX, z.x + z.width);
+          maxY = Math.max(maxY, z.y + z.height);
+        });
+      }
+      if (data.lanes) {
+        data.lanes.forEach(l => {
+          minY = Math.min(minY, l.y);
+          maxY = Math.max(maxY, l.y + l.height);
+        });
+        maxX = Math.max(maxX, 4400);
+      }
+
+      const padding = 60;
+      const totalW = Math.ceil(maxX + padding * 2);
+      const totalH = Math.ceil(maxY + padding * 2);
+
+      const svgEl = document.getElementById('svg-layer');
+      const clone = svgEl.cloneNode(true);
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('viewBox', '0 0 ' + totalW + ' ' + totalH);
+      clone.setAttribute('width', totalW);
+      clone.setAttribute('height', totalH);
+      clone.style.backgroundColor = '#070a13';
+
+      // Create pure SVG nodes group
+      const nodesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      nodesGroup.setAttribute('id', 'export-vector-nodes');
+
+      data.nodes.forEach(n => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('transform', 'translate(' + n.x + ', ' + n.y + ')');
+
+        if (n.type === 'decision') {
+          const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+          const cx = n.w / 2, cy = n.h / 2;
+          poly.setAttribute('points', cx + ',0 ' + n.w + ',' + cy + ' ' + cx + ',' + n.h + ' 0,' + cy);
+          poly.setAttribute('fill', '#1c1917');
+          poly.setAttribute('stroke', '#d97706');
+          poly.setAttribute('stroke-width', '1.5');
+          g.appendChild(poly);
+
+          const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          txt.setAttribute('x', cx);
+          txt.setAttribute('y', cy + 4);
+          txt.setAttribute('text-anchor', 'middle');
+          txt.setAttribute('fill', '#f59e0b');
+          txt.setAttribute('font-size', '10px');
+          txt.setAttribute('font-family', 'JetBrains Mono, monospace');
+          txt.setAttribute('font-weight', '700');
+          txt.textContent = n.label;
+          g.appendChild(txt);
+        } else {
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('width', n.w);
+          rect.setAttribute('height', n.h);
+          rect.setAttribute('rx', '10');
+          rect.setAttribute('fill', '#0f172a');
+          rect.setAttribute('stroke', n.type === 'end' ? '#10b981' : '#334155');
+          rect.setAttribute('stroke-width', '1');
+          g.appendChild(rect);
+
+          let roleFill = '#64748b';
+          if (n.role && n.role.includes('Architect')) roleFill = '#c084fc';
+          else if (n.role && n.role.includes('QA')) roleFill = '#34d399';
+          else if (n.role && n.role.includes('Coder')) roleFill = '#fbbf24';
+          else if (n.role && n.role.includes('Auditor')) roleFill = '#22d3ee';
+          else if (n.role && n.role.includes('Human')) roleFill = '#fb7185';
+          else if (n.role && n.role.includes('Coordinator')) roleFill = '#60a5fa';
+
+          const phaseTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          phaseTxt.setAttribute('x', '12');
+          phaseTxt.setAttribute('y', '22');
+          phaseTxt.setAttribute('fill', '#64748b');
+          phaseTxt.setAttribute('font-size', '9px');
+          phaseTxt.setAttribute('font-family', 'JetBrains Mono, monospace');
+          phaseTxt.setAttribute('font-weight', '600');
+          phaseTxt.textContent = (n.phase || 'STAGE').toUpperCase();
+          g.appendChild(phaseTxt);
+
+          if (n.role) {
+            const roleTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            roleTxt.setAttribute('x', n.w - 12);
+            roleTxt.setAttribute('y', '22');
+            roleTxt.setAttribute('text-anchor', 'end');
+            roleTxt.setAttribute('fill', roleFill);
+            roleTxt.setAttribute('font-size', '9px');
+            roleTxt.setAttribute('font-family', 'Inter, sans-serif');
+            roleTxt.setAttribute('font-weight', '700');
+            roleTxt.textContent = n.role;
+            g.appendChild(roleTxt);
+          }
+
+          const labelTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          labelTxt.setAttribute('x', '12');
+          labelTxt.setAttribute('y', '46');
+          labelTxt.setAttribute('fill', '#f8fafc');
+          labelTxt.setAttribute('font-size', '12px');
+          labelTxt.setAttribute('font-family', 'Inter, sans-serif');
+          labelTxt.setAttribute('font-weight', '700');
+          labelTxt.textContent = n.label;
+          g.appendChild(labelTxt);
+
+          if (n.sub) {
+            const subTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            subTxt.setAttribute('x', '12');
+            subTxt.setAttribute('y', '64');
+            subTxt.setAttribute('fill', '#94a3b8');
+            subTxt.setAttribute('font-size', '10px');
+            subTxt.setAttribute('font-family', 'Inter, sans-serif');
+            subTxt.textContent = n.sub;
+            g.appendChild(subTxt);
+          }
+        }
+        nodesGroup.appendChild(g);
+      });
+
+      const edgeLabels = clone.querySelector('#svg-edge-labels');
+      if (edgeLabels) {
+        clone.insertBefore(nodesGroup, edgeLabels);
+      } else {
+        clone.appendChild(nodesGroup);
+      }
+
+      const blob = new Blob([clone.outerHTML], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'workflow-' + currentViewKey + '-' + Date.now() + '.svg';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
+`;
+
+fs.writeFileSync(targetPath, htmlContent, 'utf8');
+console.log('Successfully wrote', targetPath);
+console.log('File size:', fs.statSync(targetPath).size, 'bytes');

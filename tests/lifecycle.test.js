@@ -34,6 +34,11 @@ try {
     assert(!fs.existsSync(path.join(root, '.git/hooks/pre-commit')));
     assert(fs.existsSync(path.join(root, '.aidlc/workflows/ai-dlc.md')));
     assert(fs.existsSync(path.join(root, '.aidlc/specs/templates/MANUAL_TRACKER.md')));
+    for (const role of ['architect', 'qa-tester', 'coder', 'auditor']) {
+      const relative = `.aidlc/agents/${role}.md`;
+      assert(fs.existsSync(path.join(root, relative)), `Missing portable subagent: ${role}`);
+      assert(fs.readFileSync(path.join(root, relative)).equals(fs.readFileSync(path.resolve(__dirname, '../kit', relative))), `Subagent payload changed while copying: ${role}`);
+    }
     assert.throws(() => copyKit(path.resolve(__dirname, '../kit/nested-copy')), /inside the source kit/);
   });
   test('copy preserves existing instructions, hooks, manifests and documents', () => {

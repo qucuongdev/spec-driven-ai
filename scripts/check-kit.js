@@ -29,10 +29,13 @@ function scan(dir) {
 }
 assert.deepStrictEqual(fs.readdirSync(kit).sort(), ['.aidlc', 'AGENTS.md'], 'Kit must expose only AGENTS.md and .aidlc/');
 scan(kit);
-assert.deepStrictEqual(fs.readdirSync(path.join(kit, '.aidlc')).sort(), ['context', 'docs', 'rules', 'specs', 'tools', 'workflows']);
+assert.deepStrictEqual(fs.readdirSync(path.join(kit, '.aidlc')).sort(), ['agents', 'company.json', 'context', 'docs', 'rules', 'specs', 'tools', 'workflows']);
 for (const name of [
+  '.aidlc/agents/architect.md', '.aidlc/agents/qa-tester.md', '.aidlc/agents/coder.md', '.aidlc/agents/auditor.md',
   '.aidlc/rules/01-system-boundaries.md', '.aidlc/rules/02-adversarial-testing.md',
-  '.aidlc/workflows/ai-dlc.md', '.aidlc/workflows/bootstrap-project-context.md',
+  '.aidlc/workflows/ai-dlc.md', '.aidlc/workflows/bootstrap-project-context.md', '.aidlc/workflows/ticket-autopilot.md',
+  '.aidlc/company.json', '.aidlc/tools/policy.js', '.aidlc/workflows/jira-to-github.md', '.aidlc/docs/COMPANY_ROLLOUT.md',
+  '.aidlc/specs/templates/intent/review.md', '.aidlc/specs/templates/intent/delivery.md',
   '.aidlc/context/business/overview.md', '.aidlc/context/business/glossary.md',
   '.aidlc/context/business/rules.md', '.aidlc/context/architecture/system.md',
   '.aidlc/docs/WORKFLOW.md', '.aidlc/docs/USER_GUIDE.md', '.aidlc/docs/AI_DLC_START_HERE.md',
@@ -40,13 +43,24 @@ for (const name of [
   '.aidlc/specs/templates/MANUAL_TRACKER.md', '.aidlc/specs/templates/intent/plan.json',
   '.aidlc/specs/active/.gitkeep', '.aidlc/specs/archive/.gitkeep'
 ]) assert(fs.existsSync(path.join(kit, name)), `Missing kit file: ${name}`);
+const companyPolicy = require(path.join(kit, '.aidlc/tools/policy.js')).load(kit);
+assert.strictEqual(companyPolicy.config.schemaVersion, 1, 'Portable company policy schema mismatch');
+const roles = ['architect', 'auditor', 'coder', 'qa-tester'];
+assert.deepStrictEqual(fs.readdirSync(path.join(kit, '.aidlc/agents')).sort(), roles.map(role => `${role}.md`), 'The portable registry must contain exactly four agent prompts');
+for (const role of roles) {
+  const prompt = fs.readFileSync(path.join(kit, '.aidlc/agents', `${role}.md`), 'utf8');
+  assert(prompt.split(/\r?\n/, 1)[0] === `# System Prompt: ${role}`, `Agent role mismatch: ${role}`);
+  for (const heading of ['Inputs', 'Permissions', 'Procedure', 'Handoff']) assert(prompt.includes(`## ${heading}`), `Missing ${heading} contract: ${role}`);
+}
 const bridge = fs.readFileSync(path.join(kit, 'AGENTS.md'), 'utf8');
 const lines = bridge.trimEnd().split(/\r?\n/).length;
 assert(lines >= 15 && lines <= 20, 'AGENTS.md must remain a thin 15-20 line bridge');
-for (const folder of ['rules', 'workflows', 'context']) assert(bridge.includes(`.aidlc/${folder}/`), `Missing bridge direction: ${folder}`);
+for (const folder of ['rules', 'workflows', 'context', 'agents']) assert(bridge.includes(`.aidlc/${folder}/`), `Missing bridge direction: ${folder}`);
 compare(path.join(kit, '.aidlc'), path.join(root, '.aidlc'));
 assert(fs.readFileSync(path.join(kit, 'AGENTS.md')).equals(fs.readFileSync(path.join(root, 'AGENTS.md'))), 'Agent bridge mismatch');
-for (const name of ['.agents', 'docs', 'specs', 'tools/aidlc', 'bin', 'src']) assert(!fs.existsSync(path.join(root, name)), `Legacy payload remains: ${name}`);
+// Other tools may keep independent skills in .agents/skills. Only the old kit
+// rule/workflow paths identify a legacy .agents payload.
+for (const name of ['.agents/rules', '.agents/workflows', 'docs', 'specs', 'tools/aidlc', 'bin', 'src']) assert(!fs.existsSync(path.join(root, name)), `Legacy payload remains: ${name}`);
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 assert(manifest.private && !manifest.bin && !manifest.main && !manifest.files, 'Root manifest must be private maintenance metadata');
 console.log('Portable kit structure, package independence, entry points and mirrors verified.');

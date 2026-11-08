@@ -1,6 +1,38 @@
 # Changelog
 
-## 2.0.0 — Unreleased
+## 2.1.0 - Unreleased
+
+### Review Corrections
+
+- Make the latest verification attempt supersede older PASS evidence, including failed logging/result recording and interrupted attempts.
+- Inspect Git changes without refreshing the real index; reject hidden index flags and unavailable registered submodules rather than reporting a false scope PASS.
+- Refuse linked metadata paths and mismatched ticket identities before helper reads/writes.
+- Preserve independent .agents/skills installations while still rejecting known legacy kit paths.
+- Correct runnable commands and ownership guidance in the generated workflow visualization; retain its existing layout.
+- Add adversarial regressions for these boundaries and give the timeout test's successful recovery its own explicitly planned execution budget.
+
+### Company Jira/GitHub Delivery
+
+- Add a concrete Jira-to-GitHub workflow and concise rollout guide: isolated ticket work, AC traceability, idempotent real PR reuse/publication, exact-HEAD independent review and current CI/review-fix loops.
+- Add company policy inspection/offline readiness, additive mandatory verification commands, configuration-sensitive evidence and bounded verification shell invocation.
+- Add review/delivery evidence templates and distinguish actual reviewed PR completion from local helper completion; preserve reviewed legacy behavior and generic local-draft compatibility.
+- Preserve unrelated dirty work; cover committed changes from initially unborn repositories and real initialized submodule content recursively in scope/evidence.
+- Keep merge/deploy/Jira writes separately authorized; label AI findings COMMENT and never forge human approval/self-approval. Fixture checks do not establish a live company delivery.
+
+### Autonomous Ticket Workflow
+
+- Default ticket-only autonomous local delivery: bootstrap context, plan, independent-role tests/code/review and a verified local PR draft.
+- Distinguish agent observations/progress/revisions from actual human approvals; retain reviewed mode and legacy behavior.
+- Record initial dirty worktree/index baseline for fresh copied kits, preserve user work and require current verification evidence.
+- Coordinator-only delegation, explicit mixed-manifest/setup ownership and truthful unsupported-harness fallback.
+- External publication/release remains separately authorized.
+
+### Specialist Agents
+
+- Add four portable specialist prompts (architect, qa-tester, coder, auditor), explicit stage owners, scoped artifact exceptions and independent handoffs.
+- Document native subagent activation versus separate-session fallback; validate and mirror the agent registry without introducing provider folders into the payload.
+
+## 2.0.0
 
 - Prevent verification from overwriting a concurrent checkpoint change; serialize short state writes and replace JSON atomically.
 - Isolate the optional helpers' CommonJS module type without modifying an ESM consumer's package.json.

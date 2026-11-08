@@ -1,25 +1,15 @@
-# Start Here: Portable AI-DLC Workflow Kit
+# Start Here
 
-This directory tree belongs in your project root. It is a set of editable files, not an installed plugin or package. No registration, account, package manager, dependency changes or Git hook installation is required.
+Copy AGENTS.md and hidden `.aidlc/` into the target project, preserving and merging existing instructions. Open your coding assistant and give it a Jira ticket link or pasted content. No separate bootstrap request is needed.
 
-## First Run
+The bundled company default is autonomous Jira-to-GitHub pull-request delivery. It follows `.aidlc/workflows/ticket-autopilot.md`: gather accessible context, fill missing baseline docs, write spec/design/plan, tests and implementation, verify and prepare pr.md, then follow jira-to-github.md to publish/reuse a real PR, perform independent review/fix loops and inspect required CI. See COMPANY_ROLLOUT.md for one-time policy/access. Ask only for information or authorization that cannot safely be determined independently.
 
-1. Preserve your project's existing instructions and documents. Merge conflicts deliberately; do not replace a real business document with a starter template.
-2. Read AGENTS.md and .aidlc/workflows/bootstrap-project-context.md. If your assistant does not automatically read AGENTS.md, explicitly ask it to read these files.
-3. Fill .aidlc/context/business/overview.md, glossary.md, rules.md and .aidlc/context/architecture/system.md using your actual sources. The responsible owner confirms the baseline.
-4. Give your assistant the ticket link/content and select feature, bugfix, refactor or express. Follow .aidlc/workflows/ai-dlc.md.
+The assistant must load the bridge instructions. If the project already has AGENTS.md, preserve it and merge a short direction to `.aidlc/workflows/ticket-autopilot.md`, or mention that path once when starting. A hidden folder alone is not automatically discovered by every tool.
 
-Example request:
+The assistant uses available authorized Jira/document tools; the standalone helper does not fetch Jira or run models. Private links need working access or pasted content. If Node/Git are unavailable, Markdown tracking is sufficient.
 
-> Read AGENTS.md and the AI-DLC workflows. Bootstrap project context from our existing documentation and code. Identify assumptions for my review before implementing tickets. Use Markdown tracking; do not install dependencies or hooks.
+Coordinator alone dispatches `.aidlc/agents/` specialists when separate contexts are supported. See USER_GUIDE.md#multi-agent-collaboration for activation and truthful fallback; fallback preparation alone cannot satisfy independent company review. Prompts do not enforce filesystem permissions.
 
-For an existing baseline:
+Reviewed mode is opt-in or repository-required. Existing records without mode stay reviewed; never manufacture human approval. Honor existing authorization for company branch push/PR/review; do not ask again for routine steps already in scope. Merge, deployment and Jira comments/status writes require separate authorization. Company completion needs real PR URL, exact current HEAD, required checks/review and no blockers; local helper completion cannot establish remote facts.
 
-> Follow the AI-DLC workflow for JIRA-1024 using the bugfix profile. Read our project overview and relevant business rules, inspect the code, and prepare the spec and plan for review before implementation.
-
-## Choose How to Track Work
-
-- **Markdown:** use .aidlc/specs/templates/MANUAL_TRACKER.md and copy the relevant files from .aidlc/specs/templates/intent into .aidlc/specs/active/TICKET/. Run your project's normal checks and record actual outputs and human decisions. No Node.js is needed for the workflow itself.
-- **Optional local helper:** with Node.js >=16 and Git, run `node .aidlc/tools/cli.js help` from your project root. The helper creates records, checks scope and records verification fingerprints. It uses only files copied with this kit, without installing anything.
-
-Use one tracking mode per ticket. Markdown records are not automatically enforced or authenticated. The helper reads state.json; it does not infer approvals from Markdown. See USER_GUIDE.md for details and WORKFLOW.md for diagrams.
+Read `.aidlc/rules/`, relevant `.aidlc/context/`, `.aidlc/workflows/ai-dlc.md` and USER_GUIDE.md. Keep artifacts in `.aidlc/specs/active/TICKET/`.

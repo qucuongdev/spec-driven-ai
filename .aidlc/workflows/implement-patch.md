@@ -1,9 +1,14 @@
 # Workflow: Implement and Verify
 
-- Check the Markdown tracker or helper status, baseline context, the spec, design and plan checkpoint.
-- Implement one verifiable Unit at a time. Keep changes relevant to the ticket and within allowedFiles, testFiles, dependencyFiles and maxFiles.
-- Record Unit checkpoints, commands/results and AC mapping in implementation.md. Explain and review test changes.
-- If approved scope, requirements or design must change, reopen the corresponding stage and obtain new downstream decisions. Do not edit state or receipts manually.
-- Run the project's real verification commands, retain evidence and review the entire diff against plan.json. In helper mode, use `check TICKET` and each approved `verify TICKET --command "..."`; in Markdown mode, record source state and results in tracker.md. Complete verification.md.
-- Commit, push and create a PR when authorized. Reverify when the source fingerprint changes. Complete pr.md with the real PR URL, CI results, risks and rollout/rollback details.
-- Never automatically revert or delete another person's changes when a check fails. Diagnose the issue, fix the part within scope or report the blocker.
+- [Owner: coder] Load .aidlc/agents/coder.md. Confirm context, spec/design/plan and QA handoff with mode-appropriate plan/tests decisions before implementing.
+- For new/changed business logic or bugfixes, do not start production implementation before QA has derived unit tests from AC/spec and recorded valid behavioral red evidence. Refactor characterization or a concrete coordinator/auditor-assessed nonautomatable alternative must be documented. Narrow earlier setup is runner/dependencies/wiring only, never business logic.
+- Implement verifiable Units inside allowedFiles, excluding dedicated tests, fixtures, snapshots and test configuration even when listed there; mixed manifests may be coder-owned only for explicitly planned setup/dependencies/wiring. Dependency files need dependencyFiles and the approved rationale. maxFiles is shared across the whole ticket.
+- Run approved checks for development feedback; record Unit changes, AC mapping, commands/exits and limitations in implementation.md. Preserve pre-existing edits; do not use auto-fix/generators that change protected files.
+- Return wrong tests to qa-tester and requirement/scope changes to architect/coordinator. Reopen affected stages and record fresh agent decisions in autonomous mode or actual human decisions in reviewed mode. Coder never fixes QA assertions, silently changes plan.json or edits state/receipts.
+- [Owner: auditor] Load .aidlc/agents/auditor.md for independent verify/pr. Review the complete diff and planned checks; use check TICKET and each verify TICKET --command "..." in helper mode. In Markdown mode, return real evidence for the coordinator's tracker.
+- Auditor writes only verification.md/pr.md/review.md reports; source and tests remain read-only. Helper-managed selected-ticket receipts/logs/lock/temp files are the explicit command-side-effect exception. Source-writing commands return for plan revision rather than running under read-only review.
+- Return code findings to coder, test findings to QA and requirement/scope findings to architect. Reverify and obtain fresh independent review of latest source HEAD after fixes/policy/fingerprint changes; never certify failed/incomplete work.
+- The coordinator records autonomous progress, or actual human checkpoints in reviewed mode and handles authorized commit/push/PR publication/release. Auditor drafts pr.md and never invents a PR URL, CI result, approval or deployment.
+- Never revert or delete another person's changes when a check fails. Diagnose within the assigned scope or report BLOCKED.
+
+A narrow coder setup Unit may run during tests after its plan decision when missing tooling prevents QA baseline. Return to QA for valid runnable tests before tests progression. Under company pull-request policy continue jira-to-github.md through real PR, exact-HEAD independent review and required CI/review outcomes; coordinator records delivery.md. A verified local draft remains preparatory work, not company completion. Specialists never delegate.
